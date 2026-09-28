@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, CircleHelp, FileText, Gauge, Laptop, LogOut, Menu, MonitorCog, Package, Settings, Users, Wrench, X } from "lucide-react";
+import { Bell, ChevronDown, CircleHelp, FileText, Gauge, Laptop, LogOut, Menu, MonitorCog, Package, Settings, UserRoundCog, Users, Wrench, X } from "lucide-react";
 import { useState, type ElementType, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { BrandMark } from "./BrandMark";
@@ -8,6 +8,7 @@ import { isProfileRole, type ProfileRole } from "@/lib/auth";
 const roleNav: Record<ProfileRole, { label: string; icon: ElementType; href: string }[]> = {
   admin: [
     { label: "Dashboard", icon: Gauge, href: "/app/admin" },
+    { label: "User Management", icon: UserRoundCog, href: "/app/admin/users" },
     { label: "Service Requests", icon: FileText, href: "/app/service-requests" },
     { label: "Customers", icon: Users, href: "/app/customers" },
     { label: "Technicians", icon: Wrench, href: "/app/technicians" },
