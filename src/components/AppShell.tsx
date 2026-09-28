@@ -12,7 +12,7 @@ const roleNav: Record<ProfileRole, { label: string; icon: ElementType; href: str
     { label: "Service Requests", icon: FileText, href: "/app/service-requests" },
     { label: "Customers", icon: Users, href: "/app/customers" },
     { label: "Technicians", icon: Wrench, href: "/app/technicians" },
-    { label: "Services & Pricing", icon: Package, href: "/app/services" },
+    { label: "Services & Pricing", icon: Package, href: "/app/admin/services" },
     { label: "Notifications", icon: Bell, href: "/app/notifications" },
     { label: "Reports", icon: MonitorCog, href: "/app/reports" },
     { label: "Settings", icon: Settings, href: "/app/settings" },

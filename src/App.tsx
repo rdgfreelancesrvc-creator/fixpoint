@@ -10,6 +10,7 @@ import QuoteApproval from "./pages/QuoteApproval";
 import Login from "./pages/Login";
 import AdminDashboard, { AdminSection } from "./pages/AdminDashboard";
 import AdminUsers from "./pages/AdminUsers";
+import AdminServices from "./pages/AdminServices";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuth } from "./contexts/AuthContext";
@@ -42,6 +43,7 @@ const App = () => (
           <Route path="/app/dashboard" element={<ProtectedRoute><RoleRedirect /></ProtectedRoute>} />
           <Route path="/app/admin" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
           <Route path="/app/admin/users" element={<ProtectedRoute requiredRole="admin"><AdminUsers /></ProtectedRoute>} />
+          <Route path="/app/admin/services" element={<ProtectedRoute requiredRole="admin"><AdminServices /></ProtectedRoute>} />
           <Route path="/app/staff" element={<ProtectedRoute requiredRole="staff"><AdminDashboard /></ProtectedRoute>} />
           <Route path="/app/technician" element={<ProtectedRoute requiredRole="technician"><AdminDashboard /></ProtectedRoute>} />
           <Route path="/app/service-requests" element={<ProtectedRoute><AdminSection title="Service Requests" /></ProtectedRoute>} />
