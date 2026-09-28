@@ -31,9 +31,9 @@ const roleNav: Record<Role, { label: string; icon: ElementType; href: string }[]
   ],
 };
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, initialRole = "Admin" }: { children: ReactNode; initialRole?: Role }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [role, setRole] = useState<Role>("Admin");
+  const [role, setRole] = useState<Role>(initialRole);
   const location = useLocation();
   const navItems = roleNav[role];
 

@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import TrackRepair from "./pages/TrackRepair";
 import RequestRepair from "./pages/RequestRepair";
 import QuoteApproval from "./pages/QuoteApproval";
+import Login from "./pages/Login";
 import AdminDashboard, { AdminSection } from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 
@@ -23,9 +24,13 @@ const App = () => (
           <Route path="/track" element={<TrackRepair />} />
           <Route path="/request" element={<RequestRepair />} />
           <Route path="/quote" element={<QuoteApproval />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/staff" element={<AdminDashboard />} />
           <Route path="/app" element={<AdminDashboard />} />
           <Route path="/app/dashboard" element={<AdminDashboard />} />
+          <Route path="/app/admin" element={<AdminDashboard role="Admin" />} />
+          <Route path="/app/staff" element={<AdminDashboard role="Staff" />} />
+          <Route path="/app/technician" element={<AdminDashboard role="Technician" />} />
           <Route path="/app/service-requests" element={<AdminSection title="Service Requests" />} />
           <Route path="/app/customers" element={<AdminSection title="Customers" />} />
           <Route path="/app/technicians" element={<AdminSection title="Technicians" />} />
