@@ -12,6 +12,10 @@ test("customer can view the prototype repair status", async ({ page }) => {
   await expect(page.getByText("Waiting for Customer Approval").first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Repair Quotation" })).toBeVisible();
   await expect(page.getByText("₱3,000")).toBeVisible();
+
+  await page.getByRole("link", { name: "Review & Approve Quotation" }).click();
+  await expect(page).toHaveURL(/\/quote$/);
+  await expect(page.getByRole("heading", { name: "Review Your Repair Quotation" })).toBeVisible();
 });
 
 test("customer sees a helpful message for an invalid repair lookup", async ({ page }) => {

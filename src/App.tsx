@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import TrackRepair from "./pages/TrackRepair";
 import RequestRepair from "./pages/RequestRepair";
+import QuoteApproval from "./pages/QuoteApproval";
 import AdminDashboard, { AdminSection } from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 
@@ -21,6 +22,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/track" element={<TrackRepair />} />
           <Route path="/request" element={<RequestRepair />} />
+          <Route path="/quote" element={<QuoteApproval />} />
           <Route path="/staff" element={<AdminDashboard />} />
           <Route path="/app" element={<AdminDashboard />} />
           <Route path="/app/dashboard" element={<AdminDashboard />} />

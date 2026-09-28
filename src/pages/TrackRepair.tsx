@@ -150,7 +150,7 @@ function QuotationCard({ actionMessage, onAction }: { actionMessage: string; onA
         </dl>
         <div className="mt-6 flex items-center gap-2 rounded-xl bg-[#fff5f3] px-3.5 py-3 text-xs font-bold text-[#8f1f27]"><Clock3 size={15} /> Awaiting Your Approval</div>
         <div className="mt-6 space-y-2.5">
-          <button type="button" onClick={() => onAction("Thanks — your approval has been noted for this prototype.")} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#B4232C] px-5 py-3.5 text-sm font-bold text-white shadow-[0_12px_24px_rgba(180,35,44,0.18)] transition-transform hover:-translate-y-0.5">Review &amp; Approve Quotation <ArrowRight size={16} /></button>
+          <Link to="/quote" className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#B4232C] px-5 py-3.5 text-sm font-bold text-white shadow-[0_12px_24px_rgba(180,35,44,0.18)] transition-transform hover:-translate-y-0.5">Review &amp; Approve Quotation <ArrowRight size={16} /></Link>
           <button type="button" onClick={() => onAction("Your response has been noted for this prototype.")} className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#dedbd6] bg-white px-5 py-3 text-sm font-bold text-[#5f5b57] transition-colors hover:border-[#B4232C] hover:text-[#B4232C]"><XCircle size={16} /> Decline Quotation</button>
         </div>
         {actionMessage && <p className="mt-4 rounded-xl bg-[#f5f4f1] px-3.5 py-3 text-xs font-semibold leading-5 text-[#5f5b57]" role="status">{actionMessage}</p>}
