@@ -1,24 +1,11 @@
 import { test, expect } from "@playwright/test";
 
-const demoLogins = [
-  { label: "admin", email: "admin@fixpoint.test", password: "Admin123!", destination: "/app/admin", workspace: "Admin workspace" },
-  { label: "staff", email: "staff@fixpoint.test", password: "Staff123!", destination: "/app/staff", workspace: "Staff workspace" },
-  { label: "technician", email: "tech@fixpoint.test", password: "Tech123!", destination: "/app/technician", workspace: "Technician workspace" },
-];
+test("redirects unauthenticated users away from the internal workspace", async ({ page }) => {
+  await page.goto("/app/admin");
 
-for (const login of demoLogins) {
-  test(`${login.label} can sign in to the correct workspace`, async ({ page }) => {
-    await page.goto("/login");
-
-    await page.getByLabel("Email").fill(login.email);
-    await page.getByRole("textbox", { name: "Password" }).fill(login.password);
-    await page.getByRole("button", { name: "Sign In" }).click();
-
-    await expect(page.getByRole("button", { name: "Signing in..." })).toBeDisabled();
-    await expect(page).toHaveURL(new RegExp(`${login.destination}$`));
-    await expect(page.getByRole("complementary").getByText(login.workspace, { exact: true })).toBeVisible();
-  });
-}
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+});
 
 test("shows a generic error for invalid credentials", async ({ page }) => {
   await page.goto("/login");

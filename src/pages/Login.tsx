@@ -1,32 +1,91 @@
 import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BrandMark } from "@/components/BrandMark";
-import { DEMO_CREDENTIALS } from "@/config/demoAuth";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { getRolePath, isProfileRole } from "@/lib/auth";
+
+type LoginError = {
+  title: string;
+  detail: string;
+};
+
+const invalidCredentialsError: LoginError = {
+  title: "Invalid email or password",
+  detail: "Please check your credentials and try again.",
+};
 
 export default function Login() {
   const navigate = useNavigate();
+  const { session, profile, isLoading, refreshProfile, signOut } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
-  const [hasError, setHasError] = useState(false);
+  const [loginError, setLoginError] = useState<LoginError | null>(null);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    if (isLoading || !session || !profile || !profile.is_active || !isProfileRole(profile.role)) return;
+    navigate(getRolePath(profile.role), { replace: true });
+  }, [isLoading, navigate, profile, session]);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setHasError(false);
+    setLoginError(null);
+    setIsSigningIn(true);
 
-    const credential = DEMO_CREDENTIALS.find(
-      (item) => item.email === email.trim().toLowerCase() && item.password === password,
-    );
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
 
-    if (!credential) {
-      setHasError(true);
+    if (error || !data.user) {
+      setLoginError(invalidCredentialsError);
+      setIsSigningIn(false);
       return;
     }
 
-    setIsSigningIn(true);
-    window.setTimeout(() => navigate(credential.destination), 650);
+    try {
+      const nextProfile = await refreshProfile(data.user.id);
+
+      if (!nextProfile) {
+        await signOut();
+        setLoginError({
+          title: "Account setup incomplete",
+          detail: "Your account has been authenticated, but your FixPoint profile has not been configured. Please contact your administrator.",
+        });
+        return;
+      }
+
+      if (!nextProfile.is_active) {
+        await signOut();
+        setLoginError({
+          title: "Account inactive",
+          detail: "Your FixPoint account is currently inactive. Please contact your administrator.",
+        });
+        return;
+      }
+
+      if (!isProfileRole(nextProfile.role)) {
+        await signOut();
+        setLoginError({
+          title: "Access configuration error",
+          detail: "Your account role has not been configured correctly. Please contact your administrator.",
+        });
+        return;
+      }
+
+      navigate(getRolePath(nextProfile.role), { replace: true });
+    } catch {
+      await signOut();
+      setLoginError({
+        title: "Unable to verify account",
+        detail: "We could not verify your FixPoint profile. Please try again or contact your administrator.",
+      });
+    } finally {
+      setIsSigningIn(false);
+    }
   };
 
   return (
@@ -79,7 +138,7 @@ export default function Login() {
                     autoComplete="email"
                     placeholder="you@example.com"
                     value={email}
-                    onChange={(event) => { setEmail(event.target.value); setHasError(false); }}
+                    onChange={(event) => { setEmail(event.target.value); setLoginError(null); }}
                     className="h-13 w-full rounded-xl border border-[#dedbd6] bg-[#fbfaf8] pl-11 pr-4 text-sm text-[#252525] outline-none transition-colors placeholder:text-[#aaa59e] focus:border-[#B4232C] focus:ring-4 focus:ring-[#B4232C]/10"
                   />
                 </div>
@@ -96,7 +155,7 @@ export default function Login() {
                     autoComplete="current-password"
                     placeholder="Enter your password"
                     value={password}
-                    onChange={(event) => { setPassword(event.target.value); setHasError(false); }}
+                    onChange={(event) => { setPassword(event.target.value); setLoginError(null); }}
                     className="h-13 w-full rounded-xl border border-[#dedbd6] bg-[#fbfaf8] pl-11 pr-12 text-sm text-[#252525] outline-none transition-colors placeholder:text-[#aaa59e] focus:border-[#B4232C] focus:ring-4 focus:ring-[#B4232C]/10"
                   />
                   <button
@@ -110,10 +169,10 @@ export default function Login() {
                 </div>
               </div>
 
-              {hasError && (
+              {loginError && (
                 <div role="alert" className="rounded-xl border border-[#efc4c3] bg-[#fff4f3] px-4 py-3 text-sm text-[#8f1f27]">
-                  <p className="font-bold">Invalid email or password</p>
-                  <p className="mt-1 text-xs leading-5 text-[#a64a4e]">Please check your credentials and try again.</p>
+                  <p className="font-bold">{loginError.title}</p>
+                  <p className="mt-1 text-xs leading-5 text-[#a64a4e]">{loginError.detail}</p>
                 </div>
               )}
 
