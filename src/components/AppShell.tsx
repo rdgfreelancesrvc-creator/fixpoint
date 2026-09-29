@@ -64,7 +64,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mb-3 px-3 text-[0.65rem] font-bold uppercase tracking-[0.2em] text-white/35">{roleLabel} workspace</div>
         <nav className="space-y-1">
           {navItems.map(({ label, icon: Icon, href }) => {
-            const active = href === "/app/requests" ? location.pathname.startsWith("/app/requests") : location.pathname === href;
+            const active = href === "/app/requests" ? location.pathname.startsWith("/app/requests") : href === "/app/my-repairs" ? location.pathname.startsWith("/app/my-repairs") : location.pathname === href;
             return (
               <Link
                 key={label}
