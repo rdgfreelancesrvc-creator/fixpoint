@@ -25,7 +25,7 @@ export function ProtectedRoute({ children, requiredRole }: { children: ReactNode
   }, [needsSignOut, signOut]);
 
   if (isInitializingInvite || isLoading || (session && profileStatus === "loading")) return <AuthLoadingState />;
-  if (isInviteSession) return <Navigate to="/auth/complete-invite" replace />;
+  if (isInviteSession) return <Navigate to="/set-password" replace />;
   if (!session) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   if (needsSignOut || !profile || !profile.is_active || !isProfileRole(profile.role)) return <AuthLoadingState />;
 

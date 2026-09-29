@@ -29,7 +29,7 @@ const queryClient = new QueryClient();
 function RoleRedirect() {
   const { profile, isInitializingInvite, isInviteSession } = useAuth();
   if (isInitializingInvite) return <InviteLoadingState />;
-  if (isInviteSession) return <Navigate to="/auth/complete-invite" replace />;
+  if (isInviteSession) return <Navigate to="/set-password" replace />;
   return profile && isProfileRole(profile.role)
     ? <Navigate to={getRolePath(profile.role)} replace />
     : <Navigate to="/login" replace />;
@@ -38,7 +38,7 @@ function RoleRedirect() {
 function InviteAwareHome() {
   const { isInviteSession, isInitializingInvite } = useAuth();
   if (isInitializingInvite) return <InviteLoadingState />;
-  return isInviteSession ? <Navigate to="/auth/complete-invite" replace /> : <Index />;
+  return isInviteSession ? <Navigate to="/set-password" replace /> : <Index />;
 }
 
 function InviteLoadingState() {
@@ -77,6 +77,7 @@ const App = () => (
           <Route path="/request" element={<RequestRepair />} />
           <Route path="/quote" element={<QuoteApproval />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/set-password" element={<CompleteInvite />} />
           <Route path="/auth/complete-invite" element={<CompleteInvite />} />
           <Route path="/setup" element={<Setup />} />
           <Route path="/setup/complete" element={<SetupComplete />} />

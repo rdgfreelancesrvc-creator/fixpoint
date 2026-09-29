@@ -19,10 +19,8 @@ const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 })
 
-const employeeInviteRedirectTo = "http://localhost:3000/auth/complete-invite"
-
 type EmployeeRole = "staff" | "technician"
-type Action = "list" | "create" | "update" | "set_status" | "delete"
+type Action = "list" | "create" | "update" | "set_status" | "delete" | "resend_invitation"
 
 type EmployeeInput = {
   full_name?: unknown
@@ -49,6 +47,26 @@ function requiredText(value: unknown, field: string) {
 
 function optionalText(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null
+}
+
+function getEmployeeInviteRedirect() {
+  const appUrl = Deno.env.get("APP_URL")?.trim().replace(/\/+$/, "")
+  if (!appUrl) {
+    throw new Error("APP_URL is missing. Configure the APP_URL Edge Function secret before sending invitations.")
+  }
+
+  let parsedUrl: URL
+  try {
+    parsedUrl = new URL(appUrl)
+  } catch {
+    throw new Error("APP_URL is invalid. Configure it as the full application URL, including https://.")
+  }
+
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+    throw new Error("APP_URL is invalid. It must use http:// or https://.")
+  }
+
+  return `${appUrl}/set-password`
 }
 
 async function requireAdmin(request: Request) {
@@ -84,6 +102,23 @@ async function getEmployee(id: string) {
   return data
 }
 
+async function sendEmployeeInvitation(employee: Awaited<ReturnType<typeof getEmployee>>) {
+  if (!employee.email) throw new Error("That employee does not have an email address.")
+
+  const { data: invited, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(employee.email, {
+    redirectTo: getEmployeeInviteRedirect(),
+    data: {
+      full_name: employee.full_name,
+      role: employee.role,
+      phone: employee.phone,
+    },
+  })
+
+  if (inviteError || !invited.user) {
+    throw new Error(inviteError?.message ?? "The invitation email could not be sent.")
+  }
+}
+
 async function handleRequest(request: Request) {
   const actor = await requireAdmin(request)
   const body = await request.json() as { action?: Action } & EmployeeInput & { id?: unknown; is_active?: unknown }
@@ -107,7 +142,7 @@ async function handleRequest(request: Request) {
     if (!isEmployeeRole(body.role)) throw new Error("Choose Staff or Technician for the employee role.")
 
     const { data: invited, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: employeeInviteRedirectTo,
+      redirectTo: getEmployeeInviteRedirect(),
       data: { full_name: fullName, role: body.role, phone },
     })
 
@@ -139,6 +174,12 @@ async function handleRequest(request: Request) {
   const id = requiredText(body.id, "Employee id")
   if (id === actor.id) throw new Error("You cannot change or delete your own admin account here.")
   const employee = await getEmployee(id)
+
+  if (action === "resend_invitation") {
+    await sendEmployeeInvitation(employee)
+    console.info(`[${functionName}] employee invitation resent`, { actorId: actor.id, employeeId: employee.id })
+    return jsonResponse({ success: true })
+  }
 
   if (action === "update") {
     const fullName = requiredText(body.full_name, "Full name")

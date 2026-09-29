@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, ShieldAlert, Users, Wrench } from "lucide-react";
+import { Loader2, Mail, ShieldAlert, Users, Wrench } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { useAuth } from "@/contexts/AuthContext";
 import { listAssignmentTechnicians, type TechnicianSummary } from "@/lib/adminServiceRequests";
+import { resendEmployeeInvitation } from "@/lib/adminUsers";
 
 function initials(name: string | null, email: string | null) {
   return (name || email || "T")
@@ -18,9 +20,13 @@ function StatusBadge({ active }: { active: boolean }) {
 }
 
 export default function AdminTechnicians() {
+  const { profile } = useAuth();
   const [technicians, setTechnicians] = useState<TechnicianSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
+  const [resendSuccess, setResendSuccess] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
 
   const loadTechnicians = useCallback(async () => {
     setIsLoading(true);
@@ -38,5 +44,21 @@ export default function AdminTechnicians() {
     void loadTechnicians();
   }, [loadTechnicians]);
 
-  return <AppShell><div className="mx-auto max-w-6xl"><div className="mb-8"><p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-[#B4232C]"><Wrench size={14} /> FixPoint workspace</p><h2 className="font-display text-3xl font-bold tracking-[-0.05em] sm:text-4xl">Technicians</h2><p className="mt-2 max-w-xl text-sm leading-6 text-[#77736e]">View active technician workload and keep assignments balanced.</p></div>{isLoading ? <div className="rounded-[1.5rem] border border-[#e5e2dd] bg-white p-12 text-center text-sm font-semibold text-[#77736e]"><Loader2 className="mx-auto mb-3 animate-spin text-[#B4232C]" size={24} />Loading technician workload...</div> : error ? <div className="rounded-[1.5rem] border border-[#efc4c3] bg-[#fff4f3] p-8 text-center" role="alert"><ShieldAlert className="mx-auto mb-3 text-[#B4232C]" size={25} /><p className="font-bold text-[#8f1f27]">Technicians could not be loaded</p><p className="mt-2 text-sm text-[#a64a4e]">{error}</p><button type="button" onClick={() => void loadTechnicians()} className="mt-5 rounded-xl bg-[#B4232C] px-4 py-2.5 text-sm font-bold text-white">Try again</button></div> : technicians.length === 0 ? <div className="rounded-[1.5rem] border border-dashed border-[#d7d3ce] bg-white/60 p-12 text-center"><Users className="mx-auto mb-3 text-[#aaa59e]" size={25} /><p className="font-bold">No technicians found</p><p className="mt-2 text-sm text-[#85817b]">Technician profiles will appear here when created.</p></div> : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{technicians.map((technician) => <article key={technician.id} className="rounded-[1.5rem] border border-[#e5e2dd] bg-white p-5 shadow-[0_12px_35px_rgba(37,37,37,0.04)]"><div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f3c7c6] text-sm font-bold text-[#8b2028]">{initials(technician.full_name, technician.email)}</span><div><h3 className="font-display text-lg font-bold">{technician.full_name || "Unnamed technician"}</h3><p className="mt-1 break-all text-xs text-[#817c76]">{technician.email || "No email"}</p></div></div><StatusBadge active={technician.is_active} /></div><div className="mt-5 border-t border-[#eeeae5] pt-4"><p className="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-[#9a9690]">Active Repairs</p><p className="mt-1 font-display text-3xl font-bold text-[#B4232C]">{technician.active_repairs}</p></div>{technician.phone && <p className="mt-4 text-sm text-[#6f6a64]">{technician.phone}</p>}</article>)}</div>}</div></AppShell>;
+  const handleResend = async (technician: TechnicianSummary) => {
+    setResendError(null);
+    setResendSuccess(null);
+    setResendingId(technician.id);
+    try {
+      await resendEmployeeInvitation(technician.id);
+      setResendSuccess(`A new invitation was sent to ${technician.email}.`);
+    } catch (resendRequestError) {
+      setResendError(resendRequestError instanceof Error ? resendRequestError.message : "The invitation could not be resent.");
+    } finally {
+      setResendingId(null);
+    }
+  };
+
+  const canResend = profile?.role === "admin";
+
+  return <AppShell><div className="mx-auto max-w-6xl"><div className="mb-8"><p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-[#B4232C]"><Wrench size={14} /> FixPoint workspace</p><h2 className="font-display text-3xl font-bold tracking-[-0.05em] sm:text-4xl">Technicians</h2><p className="mt-2 max-w-xl text-sm leading-6 text-[#77736e]">View active technician workload and keep assignments balanced.</p></div>{resendSuccess && <div className="mb-5 rounded-xl border border-[#d9eadc] bg-[#f3fbf4] px-4 py-3 text-sm font-semibold text-[#267342]" role="status">{resendSuccess}</div>}{resendError && <div className="mb-5 rounded-xl border border-[#efc4c3] bg-[#fff4f3] px-4 py-3 text-sm font-semibold text-[#8f1f27]" role="alert">{resendError}</div>}{isLoading ? <div className="rounded-[1.5rem] border border-[#e5e2dd] bg-white p-12 text-center text-sm font-semibold text-[#77736e]"><Loader2 className="mx-auto mb-3 animate-spin text-[#B4232C]" size={24} />Loading technician workload...</div> : error ? <div className="rounded-[1.5rem] border border-[#efc4c3] bg-[#fff4f3] p-8 text-center" role="alert"><ShieldAlert className="mx-auto mb-3 text-[#B4232C]" size={25} /><p className="font-bold text-[#8f1f27]">Technicians could not be loaded</p><p className="mt-2 text-sm text-[#a64a4e]">{error}</p><button type="button" onClick={() => void loadTechnicians()} className="mt-5 rounded-xl bg-[#B4232C] px-4 py-2.5 text-sm font-bold text-white">Try again</button></div> : technicians.length === 0 ? <div className="rounded-[1.5rem] border border-dashed border-[#d7d3ce] bg-white/60 p-12 text-center"><Users className="mx-auto mb-3 text-[#aaa59e]" size={25} /><p className="font-bold">No technicians found</p><p className="mt-2 text-sm text-[#85817b]">Technician profiles will appear here when created.</p></div> : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{technicians.map((technician) => <article key={technician.id} className="rounded-[1.5rem] border border-[#e5e2dd] bg-white p-5 shadow-[0_12px_35px_rgba(37,37,37,0.04)]"><div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f3c7c6] text-sm font-bold text-[#8b2028]">{initials(technician.full_name, technician.email)}</span><div><h3 className="font-display text-lg font-bold">{technician.full_name || "Unnamed technician"}</h3><p className="mt-1 break-all text-xs text-[#817c76]">{technician.email || "No email"}</p></div></div><StatusBadge active={technician.is_active} /></div><div className="mt-5 border-t border-[#eeeae5] pt-4"><p className="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-[#9a9690]">Active Repairs</p><p className="mt-1 font-display text-3xl font-bold text-[#B4232C]">{technician.active_repairs}</p></div>{technician.phone && <p className="mt-4 text-sm text-[#6f6a64]">{technician.phone}</p>}{canResend && <button type="button" disabled={!technician.email || resendingId === technician.id} onClick={() => void handleResend(technician)} className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#efc4c3] bg-[#fff8f7] px-4 text-sm font-bold text-[#8f1f27] transition-colors hover:bg-[#fff0ef] disabled:cursor-not-allowed disabled:opacity-50"><Mail size={16} />{resendingId === technician.id ? "Sending invitation..." : "Resend invitation"}</button>}</article>)}</div>}</div></AppShell>;
 }

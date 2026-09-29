@@ -5,10 +5,12 @@ import type { Profile } from "@/lib/auth";
 
 type ProfileStatus = "loading" | "ready" | "missing" | "error";
 
-type InviteHash = {
+type InviteUrl = {
   isInvite: boolean;
   accessToken: string | null;
   refreshToken: string | null;
+  code: string | null;
+  errorMessage: string | null;
 };
 
 type AuthContextValue = {
@@ -18,6 +20,7 @@ type AuthContextValue = {
   isInitializingInvite: boolean;
   profileStatus: ProfileStatus;
   profileError: Error | null;
+  inviteError: string | null;
   isInviteSession: boolean;
   refreshProfile: (userId: string) => Promise<Profile | null>;
   clearInviteSession: () => void;
@@ -25,32 +28,55 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-const expiredInviteMessage = "This invitation has expired or is no longer valid. Please contact your administrator.";
+const expiredInviteMessage = "This invitation has expired or is no longer valid. Please request a new invitation from your administrator.";
 
-function readInviteHash(): InviteHash {
-  if (typeof window === "undefined") return { isInvite: false, accessToken: null, refreshToken: null };
+function getInviteErrorMessage(error: string | null, errorCode: string | null, errorDescription: string | null, hasOtpExpired: boolean) {
+  if (hasOtpExpired || errorCode === "otp_expired" || error === "otp_expired") return "This invitation has expired. Please request a new invitation from your administrator.";
+  if (error === "access_denied" || errorCode === "access_denied") return "This invitation was denied or is no longer valid. Please request a new invitation from your administrator.";
+  if (errorDescription) return errorDescription;
+  if (error || errorCode) return "This invitation could not be verified. Please request a new invitation from your administrator.";
+  return null;
+}
 
-  const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+function readInviteUrl(): InviteUrl {
+  if (typeof window === "undefined") {
+    return { isInvite: false, accessToken: null, refreshToken: null, code: null, errorMessage: null };
+  }
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const error = searchParams.get("error") ?? hashParams.get("error");
+  const errorCode = searchParams.get("error_code") ?? hashParams.get("error_code");
+  const errorDescription = searchParams.get("error_description") ?? hashParams.get("error_description");
+  const hasOtpExpired = searchParams.has("otp_expired") || hashParams.has("otp_expired");
+  const code = searchParams.get("code");
+  const isInvite = hashParams.get("type") === "invite" || Boolean(code) || Boolean(error || errorCode || errorDescription || hasOtpExpired);
+
   return {
-    isInvite: params.get("type") === "invite",
-    accessToken: params.get("access_token"),
-    refreshToken: params.get("refresh_token"),
+    isInvite,
+    accessToken: hashParams.get("access_token"),
+    refreshToken: hashParams.get("refresh_token"),
+    code,
+    errorMessage: getInviteErrorMessage(error, errorCode, errorDescription, hasOtpExpired),
   };
 }
 
-function removeInviteHash() {
-  if (typeof window === "undefined" || !window.location.hash) return;
-  window.history.replaceState(null, document.title, `${window.location.pathname}${window.location.search}`);
+function removeInviteUrl() {
+  if (typeof window === "undefined") return;
+  if (!window.location.hash && !window.location.search) return;
+  window.history.replaceState(null, document.title, window.location.pathname);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const initialInviteUrl = readInviteUrl();
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isInitializingInvite, setIsInitializingInvite] = useState(() => readInviteHash().isInvite);
+  const [isInitializingInvite, setIsInitializingInvite] = useState(initialInviteUrl.isInvite);
   const [profileStatus, setProfileStatus] = useState<ProfileStatus>("loading");
   const [profileError, setProfileError] = useState<Error | null>(null);
-  const [isInviteSession, setIsInviteSession] = useState(() => readInviteHash().isInvite);
+  const [inviteError, setInviteError] = useState<string | null>(initialInviteUrl.errorMessage);
+  const [isInviteSession, setIsInviteSession] = useState(initialInviteUrl.isInvite);
 
   const refreshProfile = async (userId: string) => {
     setProfileStatus("loading");
@@ -79,12 +105,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
     let isInitializing = true;
-    const inviteHash = readInviteHash();
+    const inviteUrl = readInviteUrl();
 
     const handleSessionChange = (_event: string, nextSession: Session | null) => {
-      if (!isMounted || isInitializing) return;
+      if (!isMounted) return;
 
       setSession(nextSession);
+      if (isInitializing) return;
+
       if (!nextSession) {
         setProfile(null);
         setProfileStatus("ready");
@@ -109,31 +137,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let authError: Error | null = null;
 
       try {
-        if (inviteHash.isInvite) {
-          if (!inviteHash.accessToken || !inviteHash.refreshToken) {
-            removeInviteHash();
-            authError = new Error(expiredInviteMessage);
-          } else {
+        if (inviteUrl.isInvite) {
+          setIsInviteSession(true);
+
+          if (inviteUrl.errorMessage) {
+            authError = new Error(inviteUrl.errorMessage);
+          } else if (inviteUrl.code) {
+            const { data: codeSession, error: codeError } = await supabase.auth.exchangeCodeForSession(inviteUrl.code);
+            if (codeError || !codeSession.session) {
+              authError = new Error(codeError?.message || expiredInviteMessage);
+            } else {
+              nextSession = codeSession.session;
+            }
+          } else if (inviteUrl.accessToken && inviteUrl.refreshToken) {
             const { data: setSessionData, error: setSessionError } = await supabase.auth.setSession({
-              access_token: inviteHash.accessToken,
-              refresh_token: inviteHash.refreshToken,
+              access_token: inviteUrl.accessToken,
+              refresh_token: inviteUrl.refreshToken,
             });
 
             if (setSessionError || !setSessionData.session) {
-              removeInviteHash();
               authError = new Error(setSessionError?.message || expiredInviteMessage);
             } else {
               nextSession = setSessionData.session;
-              removeInviteHash();
+            }
+          } else {
+            authError = new Error(expiredInviteMessage);
+          }
 
-              const { data: userData, error: userError } = await supabase.auth.getUser();
-              if (userError || !userData.user) {
-                authError = new Error(userError?.message || expiredInviteMessage);
-              } else if (userData.user.id !== nextSession.user.id) {
-                authError = new Error(expiredInviteMessage);
-              } else {
-                authenticatedUserId = userData.user.id;
-              }
+          removeInviteUrl();
+
+          if (!authError && nextSession) {
+            const { data: userData, error: userError } = await supabase.auth.getUser();
+            if (userError || !userData.user) {
+              authError = new Error(userError?.message || expiredInviteMessage);
+            } else if (userData.user.id !== nextSession.user.id) {
+              authError = new Error(expiredInviteMessage);
+            } else {
+              authenticatedUserId = userData.user.id;
             }
           }
         } else {
@@ -149,6 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(null);
           setProfileStatus("error");
           setProfileError(authError);
+          if (inviteUrl.isInvite) setInviteError(authError.message);
           return;
         }
 
@@ -160,17 +201,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const nextProfile = await refreshProfile(authenticatedUserId || nextSession.user.id);
-        if (inviteHash.isInvite && (!nextProfile || nextProfile.id !== authenticatedUserId)) {
-          setProfile(null);
-          setProfileStatus("missing");
-          setProfileError(new Error(expiredInviteMessage));
+        if (inviteUrl.isInvite && !nextProfile) {
+          setInviteError("Your FixPoint employee profile could not be found. Please request a new invitation from your administrator.");
         }
       } catch (error) {
         if (!isMounted) return;
+        const nextError = error instanceof Error ? error : new Error(expiredInviteMessage);
         setSession(null);
         setProfile(null);
         setProfileStatus("error");
-        setProfileError(error instanceof Error ? error : new Error(expiredInviteMessage));
+        setProfileError(nextError);
+        if (inviteUrl.isInvite) setInviteError(nextError.message);
       } finally {
         isInitializing = false;
         if (isMounted) {
@@ -195,17 +236,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isInitializingInvite,
     profileStatus,
     profileError,
+    inviteError,
     isInviteSession,
     refreshProfile,
     clearInviteSession: () => {
-      removeInviteHash();
+      removeInviteUrl();
+      setInviteError(null);
       setIsInviteSession(false);
     },
     signOut: async () => {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     },
-  }), [isInitializingInvite, isInviteSession, isLoading, profile, profileError, profileStatus, session]);
+  }), [inviteError, isInitializingInvite, isInviteSession, isLoading, profile, profileError, profileStatus, session]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -5,7 +5,7 @@ export type EmployeeRole = "staff" | "technician";
 export type Employee = Profile & { role: EmployeeRole };
 
 type EmployeePayload = {
-  action: "create" | "update" | "set_status" | "delete" | "list";
+  action: "create" | "update" | "set_status" | "delete" | "list" | "resend_invitation";
   id?: string;
   full_name?: string;
   email?: string;
@@ -50,4 +50,8 @@ export async function setEmployeeStatus(id: string, isActive: boolean) {
 
 export async function deleteEmployee(id: string) {
   await invokeEmployeeManagement({ action: "delete", id });
+}
+
+export async function resendEmployeeInvitation(id: string) {
+  await invokeEmployeeManagement({ action: "resend_invitation", id });
 }
