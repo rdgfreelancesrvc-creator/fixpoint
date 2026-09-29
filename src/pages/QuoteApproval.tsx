@@ -1,206 +1,57 @@
-import { useState } from "react";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  CheckCircle2,
-  Clock3,
-  FileText,
-  Laptop,
-  ShieldCheck,
-  X,
-  XCircle,
-} from "lucide-react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { ArrowLeft, Check, CheckCircle2, Clock3, FileText, Laptop, Loader2, ShieldCheck, X, XCircle } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
 import { PublicHeader } from "@/components/PublicHeader";
 import { SectionEyebrow } from "@/components/BrandMark";
+import { Textarea } from "@/components/ui/textarea";
+import { getPublicQuotation, respondToQuotation, formatQuotationDate, type PublicQuotation, type QuotationStatus } from "@/lib/quotations";
 
-type Decision = "pending" | "approved" | "declined";
+type Modal = "approve" | "decline" | null;
+const peso = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
+const money = (value: number) => peso.format(Number(value) || 0);
+const statusLabels: Record<QuotationStatus, string> = { draft: "Draft", sent: "Awaiting Customer Approval", approved: "Approved", declined: "Declined", expired: "Expired", cancelled: "Cancelled" };
 
-const requestNumber = "SR-2026-000123";
-
-function SummaryCard() {
-  const details = [
-    ["Customer", "John Doe"],
-    ["Device", "Dell Inspiron 15"],
-    ["Service", "Laptop Repair"],
-    ["Date Received", "September 29, 2026"],
-  ];
-
-  return (
-    <section className="rounded-[1.5rem] border border-[#e5e1db] bg-white p-5 shadow-[0_14px_35px_rgba(37,37,37,0.04)] sm:p-8" aria-labelledby="summary-heading">
-      <div className="flex items-center gap-3 border-b border-[#eeeae5] pb-6">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#fff0ef] text-[#B4232C]"><Laptop size={19} /></span>
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#B4232C]">Your repair</p>
-          <h2 id="summary-heading" className="mt-1 font-display text-2xl font-bold tracking-[-0.05em]">Customer &amp; device summary</h2>
-        </div>
-      </div>
-      <dl className="mt-2 divide-y divide-[#eeeae5]">
-        {details.map(([label, value]) => (
-          <div key={label} className="grid gap-1 py-4 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] sm:gap-4">
-            <dt className="text-xs font-bold uppercase tracking-[0.1em] text-[#9a9690]">{label}</dt>
-            <dd className="text-sm font-semibold text-[#4e4a46]">{value}</dd>
-          </div>
-        ))}
-      </dl>
-    </section>
-  );
+function StatusBanner({ status }: { status: QuotationStatus }) {
+  const isApproved = status === "approved";
+  const isDeclined = status === "declined" || status === "cancelled";
+  const isExpired = status === "expired";
+  return <div className={`flex items-start gap-3 rounded-2xl px-4 py-4 ${isApproved ? "bg-[#edf8f0] text-[#267342]" : isDeclined ? "bg-[#fff7e8] text-[#946516]" : isExpired ? "bg-[#f2f0ec] text-[#77736e]" : "bg-[#fff5f3] text-[#8f1f27]"}`}><span className="mt-0.5">{isApproved ? <CheckCircle2 size={19} /> : isDeclined || isExpired ? <XCircle size={19} /> : <Clock3 size={19} />}</span><div><p className="font-bold">{isApproved ? "Quotation Approved" : isDeclined ? "Quotation Declined" : isExpired ? "Quotation Expired" : "Quotation Status: Awaiting Your Approval"}</p><p className="mt-1 text-sm leading-6 opacity-80">{isApproved ? "Thank you. FixPoint has recorded your approval." : isDeclined ? "Your response has been recorded. The repair will not proceed under this quotation." : isExpired ? "This quotation is no longer available for approval or decline." : "Please review the repair details and choose how you would like to proceed."}</p></div></div>;
 }
 
-function DiagnosisCard() {
-  return (
-    <section className="rounded-[1.5rem] border border-[#e5e1db] bg-white p-5 shadow-[0_14px_35px_rgba(37,37,37,0.04)] sm:p-8" aria-labelledby="diagnosis-heading">
-      <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f5f4f1] text-[#5f5b57]"><CheckCircle2 size={19} /></span>
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#B4232C]">Diagnosis</p>
-          <h2 id="diagnosis-heading" className="mt-1 font-display text-2xl font-bold tracking-[-0.05em]">What We Found</h2>
-        </div>
-      </div>
-      <p className="mt-6 text-sm leading-7 text-[#5f5b57]">During diagnosis, our technician found that the laptop cooling fan requires replacement. Internal cleaning is also recommended to improve cooling performance.</p>
-    </section>
-  );
+function RequestSummary({ quote }: { quote: PublicQuotation }) {
+  const details = [["Quotation Number", quote.quotation_number], ["Request Number", quote.request_number], ["Device", [quote.brand, quote.model].filter(Boolean).join(" ") || quote.device_type], ["Device Type", quote.device_type], ["Service Requested", quote.service_name || "Repair service"]];
+  return <section className="rounded-[1.5rem] border border-[#e5e1db] bg-white p-5 shadow-[0_14px_35px_rgba(37,37,37,0.04)] sm:p-8" aria-labelledby="request-summary-heading"><div className="flex items-center gap-3 border-b border-[#eeeae5] pb-6"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#fff0ef] text-[#B4232C]"><Laptop size={19} /></span><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#B4232C]">Your repair</p><h2 id="request-summary-heading" className="mt-1 font-display text-2xl font-bold tracking-[-0.05em]">Repair details</h2></div></div><dl className="mt-2 divide-y divide-[#eeeae5]">{details.map(([label, value]) => <div key={label} className="grid gap-1 py-4 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] sm:gap-4"><dt className="text-xs font-bold uppercase tracking-[0.1em] text-[#9a9690]">{label}</dt><dd className="text-sm font-semibold text-[#4e4a46]">{value}</dd></div>)}</dl></section>;
 }
 
-function QuotationCard() {
-  const items = [
-    ["Labor", "Laptop repair and installation", "₱1,200"],
-    ["Parts", "Replacement cooling fan", "₱1,800"],
-    ["Service", "Internal cleaning", "₱0"],
-  ];
-
-  return (
-    <section className="overflow-hidden rounded-[1.5rem] border border-[#ead9d6] bg-white shadow-[0_18px_42px_rgba(180,35,44,0.08)]" aria-labelledby="quotation-heading">
-      <div className="bg-[#fff5f3] p-5 sm:p-8">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#B4232C]">Your estimate</p>
-            <h2 id="quotation-heading" className="mt-2 font-display text-2xl font-bold tracking-[-0.05em]">Repair Quotation</h2>
-          </div>
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#B4232C] shadow-sm"><FileText size={19} /></span>
-        </div>
-      </div>
-      <div className="p-5 sm:p-8">
-        <dl className="space-y-5">
-          {items.map(([label, description, amount]) => (
-            <div key={label} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
-              <div>
-                <dt className="text-sm font-bold text-[#4e4a46]">{label}</dt>
-                <dd className="mt-1 text-xs leading-5 text-[#817c76]">{description}</dd>
-              </div>
-              <span className="text-sm font-bold text-[#3e3a36] sm:shrink-0">{amount}</span>
-            </div>
-          ))}
-        </dl>
-        <div className="mt-7 flex items-center justify-between gap-4 border-t border-[#eeeae5] pt-6">
-          <span className="font-bold text-[#4e4a46]">Estimated Total</span>
-          <span className="font-display text-2xl font-bold text-[#B4232C]">₱3,000</span>
-        </div>
-        <div className="mt-6 flex items-center gap-2 rounded-xl bg-[#fff5f3] px-3.5 py-3 text-xs font-bold text-[#8f1f27]"><Clock3 size={15} /> Quotation Status: Awaiting Your Approval</div>
-      </div>
-    </section>
-  );
+function QuotationCard({ quote }: { quote: PublicQuotation }) {
+  return <section className="overflow-hidden rounded-[1.5rem] border border-[#ead9d6] bg-white shadow-[0_18px_42px_rgba(180,35,44,0.08)]" aria-labelledby="quotation-heading"><div className="bg-[#fff5f3] p-5 sm:p-8"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#B4232C]">FixPoint</p><h2 id="quotation-heading" className="mt-2 font-display text-2xl font-bold tracking-[-0.05em]">Repair Quotation</h2></div><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#B4232C] shadow-sm"><FileText size={19} /></span></div></div><div className="p-5 sm:p-8"><StatusBanner status={quote.status} />{quote.diagnosis_summary && <div className="mt-7"><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#B4232C]">Diagnosis Summary</p><p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-[#5f5b57]">{quote.diagnosis_summary}</p></div>}{quote.customer_message && <div className="mt-6 rounded-2xl bg-[#fbfaf8] p-4"><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#B4232C]">Message from FixPoint</p><p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-[#5f5b57]">{quote.customer_message}</p></div>}<div className="mt-7 overflow-hidden rounded-xl border border-[#eeeae5]"><div className="hidden grid-cols-[minmax(0,1fr)_80px_120px_120px] gap-3 bg-[#fbfaf8] px-4 py-3 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[#9a9690] sm:grid"><span>Description</span><span>Qty</span><span>Unit Price</span><span className="text-right">Line Total</span></div>{quote.items.map((item, index) => <div key={`${item.item_type}-${item.description}-${index}`} className="grid gap-2 border-t border-[#eeeae5] px-4 py-4 first:border-t-0 sm:grid-cols-[minmax(0,1fr)_80px_120px_120px] sm:items-center sm:gap-3"><div><p className="text-sm font-bold text-[#4e4a46]">{item.description}</p><p className="mt-1 text-xs capitalize text-[#817c76]">{item.item_type}</p></div><div className="flex justify-between gap-3 text-sm text-[#5f5b57] sm:block"><span className="sm:hidden">Quantity</span>{item.quantity}</div><div className="flex justify-between gap-3 text-sm text-[#5f5b57] sm:block"><span className="sm:hidden">Unit price</span>{money(item.unit_price)}</div><div className="flex justify-between gap-3 text-sm font-bold text-[#3e3a36] sm:block sm:text-right"><span className="sm:hidden">Line total</span>{money(item.line_total)}</div></div>)}</div><dl className="mt-6 space-y-3 border-t border-[#eeeae5] pt-5"><div className="flex items-center justify-between gap-4 text-sm text-[#6f6a64]"><dt>Parts Subtotal</dt><dd className="font-semibold">{money(quote.parts_subtotal)}</dd></div><div className="flex items-center justify-between gap-4 text-sm text-[#6f6a64]"><dt>Labor Subtotal</dt><dd className="font-semibold">{money(quote.labor_subtotal)}</dd></div><div className="flex items-end justify-between gap-4 border-t border-[#eeeae5] pt-4"><dt className="font-bold text-[#4e4a46]">Total Amount</dt><dd className="font-display text-3xl font-bold text-[#B4232C]">{money(quote.total_amount)}</dd></div></dl><div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[#77736e]"><span>Valid until: <strong>{formatQuotationDate(quote.valid_until)}</strong></span>{quote.sent_at && <span>Sent: <strong>{new Intl.DateTimeFormat("en-PH", { dateStyle: "medium" }).format(new Date(quote.sent_at))}</strong></span>}</div></div></section>;
 }
 
-function CompletionCard() {
-  return (
-    <section className="rounded-[1.5rem] border border-[#e5e1db] bg-[#252525] p-5 text-white sm:p-7" aria-labelledby="completion-heading">
-      <div className="flex items-start gap-3">
-        <Clock3 size={19} className="mt-0.5 shrink-0 text-[#f3c7c6]" />
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#f3c7c6]">Timing estimate</p>
-          <h2 id="completion-heading" className="mt-2 font-display text-xl font-bold tracking-[-0.04em]">Estimated Completion</h2>
-          <p className="mt-3 text-sm leading-6 text-white/70">1–2 business days after approval, subject to parts availability.</p>
-          <p className="mt-3 text-xs leading-5 text-white/45">This is an estimate, not a guaranteed completion time.</p>
-        </div>
-      </div>
-    </section>
-  );
+function DecisionButtons({ quote, onOpen }: { quote: PublicQuotation; onOpen: (modal: Exclude<Modal, null>) => void }) {
+  if (quote.status !== "sent") return null;
+  return <section className="rounded-[1.5rem] border border-[#ead9d6] bg-white p-5 shadow-[0_18px_42px_rgba(180,35,44,0.08)] sm:p-8" aria-labelledby="decision-heading"><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#B4232C]">Your decision</p><h2 id="decision-heading" className="mt-2 font-display text-2xl font-bold leading-tight tracking-[-0.05em] sm:text-3xl">Would you like us to proceed with the repair?</h2><div className="mt-7 space-y-3"><button type="button" onClick={() => onOpen("approve")} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#B4232C] px-5 py-4 text-sm font-bold text-white shadow-[0_12px_24px_rgba(180,35,44,0.18)] transition-transform hover:-translate-y-0.5">Approve Repair <Check size={16} /></button><button type="button" onClick={() => onOpen("decline")} className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#dedbd6] bg-white px-5 py-3.5 text-sm font-bold text-[#5f5b57] transition-colors hover:border-[#B4232C] hover:text-[#B4232C]"><XCircle size={16} /> Decline Quotation</button></div><p className="mt-5 flex items-start gap-2 text-xs leading-5 text-[#89847d]"><ShieldCheck size={15} className="mt-0.5 shrink-0 text-[#B4232C]" /> By approving this quotation, you confirm that you approve the quoted repair amount.</p></section>;
 }
 
-function DecisionSection({ onApprove, onDecline }: { onApprove: () => void; onDecline: () => void }) {
-  return (
-    <section className="rounded-[1.5rem] border border-[#ead9d6] bg-white p-5 shadow-[0_18px_42px_rgba(180,35,44,0.08)] sm:p-8" aria-labelledby="decision-heading">
-      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#B4232C]">Your decision</p>
-      <h2 id="decision-heading" className="mt-2 font-display text-2xl font-bold leading-tight tracking-[-0.05em] sm:text-3xl">Would you like us to proceed with the repair?</h2>
-      <div className="mt-7 space-y-3">
-        <button type="button" onClick={onApprove} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#B4232C] px-5 py-4 text-sm font-bold text-white shadow-[0_12px_24px_rgba(180,35,44,0.18)] transition-transform hover:-translate-y-0.5">Approve Repair — ₱3,000 <ArrowRight size={16} /></button>
-        <button type="button" onClick={onDecline} className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#dedbd6] bg-white px-5 py-3.5 text-sm font-bold text-[#5f5b57] transition-colors hover:border-[#B4232C] hover:text-[#B4232C]"><XCircle size={16} /> Decline Quotation</button>
-      </div>
-      <p className="mt-5 flex items-start gap-2 text-xs leading-5 text-[#89847d]"><ShieldCheck size={15} className="mt-0.5 shrink-0 text-[#B4232C]" /> By approving this quotation, you authorize FixPoint to proceed with the listed repair services and charges.</p>
-    </section>
-  );
+function ResponseModal({ type, onCancel, onConfirm, isSubmitting, comment, setComment }: { type: Exclude<Modal, null>; onCancel: () => void; onConfirm: () => void; isSubmitting: boolean; comment: string; setComment: (value: string) => void }) {
+  const isApprove = type === "approve";
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#252525]/45 px-5 py-8" role="presentation" onClick={onCancel}><div className="relative w-full max-w-md rounded-[1.5rem] border border-[#e5e1db] bg-white p-6 shadow-[0_25px_70px_rgba(37,37,37,0.2)] sm:p-8" role="dialog" aria-modal="true" aria-labelledby="response-dialog-heading" onClick={(event) => event.stopPropagation()}><button type="button" aria-label="Close response dialog" onClick={onCancel} className="absolute right-5 top-5 rounded-xl p-2 text-[#817c76] hover:bg-[#f5f4f1]"><X size={18} /></button><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#fff0ef] text-[#B4232C]">{isApprove ? <Check size={21} /> : <XCircle size={21} />}</span><h2 id="response-dialog-heading" className="mt-5 font-display text-2xl font-bold tracking-[-0.05em]">{isApprove ? "Approve this repair?" : "Why are you declining this quotation?"}</h2><p className="mt-3 text-sm leading-6 text-[#77736e]">{isApprove ? "This confirms that you approve the quoted repair amount." : "Your comment is optional and will help our team understand your decision."}</p>{!isApprove && <Textarea value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Optional comment" className="mt-5 min-h-28 rounded-xl border-[#dedbd6]" /> }<div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button type="button" onClick={onCancel} disabled={isSubmitting} className="inline-flex items-center justify-center rounded-full border border-[#dedbd6] bg-white px-5 py-3 text-sm font-bold text-[#5f5b57]">Cancel</button><button type="button" onClick={onConfirm} disabled={isSubmitting} className="inline-flex items-center justify-center rounded-full bg-[#B4232C] px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{isSubmitting ? "Saving..." : isApprove ? "Approve Repair" : "Decline Quotation"}</button></div></div></div>;
 }
 
-function DeclineModal({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#252525]/45 px-5 py-8" role="presentation" onClick={onCancel}>
-      <div className="relative w-full max-w-md rounded-[1.5rem] border border-[#e5e1db] bg-white p-6 shadow-[0_25px_70px_rgba(37,37,37,0.2)] sm:p-8" role="dialog" aria-modal="true" aria-labelledby="decline-dialog-heading" onClick={(event) => event.stopPropagation()}>
-        <button type="button" aria-label="Close decline confirmation" onClick={onCancel} className="absolute right-5 top-5 rounded-xl p-2 text-[#817c76] transition-colors hover:bg-[#f5f4f1] hover:text-[#252525]"><X size={18} /></button>
-        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#fff0ef] text-[#B4232C]"><XCircle size={21} /></span>
-        <h2 id="decline-dialog-heading" className="mt-5 font-display text-2xl font-bold tracking-[-0.05em]">Decline This Quotation?</h2>
-        <p className="mt-3 text-sm leading-6 text-[#77736e]">Are you sure you don't want to proceed with this repair quotation?</p>
-        <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <button type="button" onClick={onCancel} className="inline-flex items-center justify-center rounded-full border border-[#dedbd6] bg-white px-5 py-3 text-sm font-bold text-[#5f5b57] transition-colors hover:border-[#B4232C] hover:text-[#B4232C]">Go Back</button>
-          <button type="button" onClick={onConfirm} className="inline-flex items-center justify-center rounded-full bg-[#B4232C] px-5 py-3 text-sm font-bold text-white shadow-[0_10px_22px_rgba(180,35,44,0.18)] transition-transform hover:-translate-y-0.5">Yes, Decline</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DecisionConfirmation({ decision }: { decision: Exclude<Decision, "pending"> }) {
-  const isApproved = decision === "approved";
-
-  return (
-    <div className="mx-auto max-w-2xl rounded-[2rem] border border-[#e5e1db] bg-white p-6 text-center shadow-[0_22px_55px_rgba(37,37,37,0.08)] sm:p-12">
-      <span className={`mx-auto flex h-16 w-16 items-center justify-center rounded-2xl ${isApproved ? "bg-[#B4232C]" : "bg-[#fff0ef]"} ${isApproved ? "text-white" : "text-[#B4232C]"}`}>
-        {isApproved ? <Check size={30} strokeWidth={2.5} /> : <XCircle size={30} />}
-      </span>
-      <p className="mt-7 text-xs font-bold uppercase tracking-[0.16em] text-[#B4232C]">Decision recorded</p>
-      <h1 className="mt-3 font-display text-4xl font-bold tracking-[-0.06em] sm:text-5xl">{isApproved ? "Repair Approved" : "Quotation Declined"}</h1>
-      <p className="mx-auto mt-5 max-w-md text-base leading-7 text-[#77736e]">{isApproved ? "Thank you. Your approval has been recorded. Our team can now proceed with the repair." : "We've recorded your decision. Our team may contact you if additional information is needed."}</p>
-      <div className="mx-auto mt-8 max-w-sm rounded-2xl bg-[#f5f4f1] p-4">
-        <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#9a9690]">Service Request</p>
-        <p className="mt-2 font-display text-lg font-bold tracking-[0.01em] text-[#252525]">{requestNumber}</p>
-        <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-[#9a9690]">Status</p>
-        <p className="mt-1 text-sm font-bold text-[#B4232C]">{isApproved ? "Approved" : "Quotation Declined"}</p>
-      </div>
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-        <Link to={isApproved ? "/track" : "/track"} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#B4232C] px-6 py-3.5 text-sm font-bold text-white shadow-[0_12px_24px_rgba(180,35,44,0.18)] transition-transform hover:-translate-y-0.5">{isApproved ? "Track My Repair" : "Return to Repair Tracking"} <ArrowRight size={16} /></Link>
-        {isApproved && <Link to="/" className="inline-flex items-center justify-center gap-2 rounded-full border border-[#dedbd6] bg-white px-6 py-3.5 text-sm font-bold text-[#5f5b57] transition-colors hover:border-[#B4232C] hover:text-[#B4232C]"><ArrowLeft size={16} /> Return to Home</Link>}
-      </div>
-    </div>
-  );
-}
+function LoadingState() { return <div className="mx-auto max-w-2xl rounded-[1.5rem] border border-[#e5e1db] bg-white p-14 text-center shadow-[0_18px_42px_rgba(37,37,37,0.06)]"><Loader2 className="mx-auto mb-3 animate-spin text-[#B4232C]" size={25} /><p className="text-sm font-semibold text-[#77736e]">Loading your quotation...</p></div>; }
 
 export default function QuoteApproval() {
-  const [decision, setDecision] = useState<Decision>("pending");
-  const [isDeclineModalOpen, setIsDeclineModalOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token") ?? "";
+  const [quote, setQuote] = useState<PublicQuotation | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [modal, setModal] = useState<Modal>(null);
+  const [comment, setComment] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  return (
-    <div className="min-h-screen bg-[#f5f4f1] text-[#252525]">
-      <PublicHeader />
-      <main id="top" className="mx-auto max-w-6xl px-5 pb-20 pt-32 sm:px-8 sm:pb-28 sm:pt-40 lg:px-10">
-        {decision === "pending" ? (
-          <>
-            <div className="mx-auto max-w-3xl text-center">
-              <SectionEyebrow>Quotation review</SectionEyebrow>
-              <h1 className="font-display text-5xl font-bold leading-[0.98] tracking-[-0.07em] sm:text-6xl">Review Your Repair <span className="text-[#B4232C]">Quotation</span></h1>
-              <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-[#77736e] sm:text-lg">Please review the diagnosis and repair estimate below. You can approve the repair or decline the quotation.</p>
-              <span className="mt-6 inline-flex items-center rounded-full bg-[#fff0ef] px-4 py-2 text-xs font-bold text-[#8f1f27]">Service Request: {requestNumber}</span>
-            </div>
-            <div className="mx-auto mt-10 grid max-w-5xl gap-5 sm:mt-14 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.9fr)]">
-              <div className="space-y-5"><SummaryCard /><DiagnosisCard /><CompletionCard /></div>
-              <div className="space-y-5"><QuotationCard /><DecisionSection onApprove={() => setDecision("approved")} onDecline={() => setIsDeclineModalOpen(true)} /></div>
-            </div>
-          </>
-        ) : (
-          <div className="pt-8 sm:pt-4"><DecisionConfirmation decision={decision} /></div>
-        )}
-      </main>
-      {isDeclineModalOpen && <DeclineModal onConfirm={() => { setIsDeclineModalOpen(false); setDecision("declined"); }} onCancel={() => setIsDeclineModalOpen(false)} />}
-    </div>
-  );
+  useEffect(() => { let active = true; setIsLoading(true); setError(null); if (!token) { setError("This quotation link is incomplete or invalid."); setIsLoading(false); return () => { active = false; }; } void getPublicQuotation(token).then((result) => { if (!active) return; if (!result) setError("This quotation link is invalid or no longer available."); else setQuote(result); }).catch((loadError) => { if (active) setError(loadError instanceof Error ? loadError.message : "This quotation could not be loaded."); }).finally(() => { if (active) setIsLoading(false); }); return () => { active = false; }; }, [token]);
+
+  const submitResponse = async () => { if (!quote || !token || !modal) return; setIsSubmitting(true); try { const result = await respondToQuotation({ token, response: modal === "approve" ? "approved" : "declined", customerName: "", customerPhone: "", customerComment: comment }); setQuote({ ...quote, status: result.status }); setModal(null); setComment(""); } catch (responseError) { setError(responseError instanceof Error ? responseError.message : "Your response could not be recorded."); } finally { setIsSubmitting(false); } };
+
+  return <div className="min-h-screen bg-[#f5f4f1] text-[#252525]"><PublicHeader /><main id="top" className="mx-auto max-w-6xl px-5 pb-20 pt-32 sm:px-8 sm:pb-28 sm:pt-40 lg:px-10">{isLoading ? <LoadingState /> : error || !quote ? <div className="mx-auto max-w-2xl rounded-[1.5rem] border border-[#ead9d6] bg-white p-8 text-center shadow-[0_18px_42px_rgba(37,37,37,0.06)] sm:p-12"><XCircle className="mx-auto mb-4 text-[#B4232C]" size={32} /><h1 className="font-display text-3xl font-bold tracking-[-0.05em]">Quotation unavailable</h1><p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#77736e]">{error || "This quotation link is invalid or no longer available."}</p><Link to="/" className="mt-7 inline-flex items-center gap-2 rounded-full bg-[#B4232C] px-5 py-3.5 text-sm font-bold text-white"><ArrowLeft size={16} /> Return to FixPoint</Link></div> : <><div className="mx-auto max-w-3xl text-center"><SectionEyebrow>Customer quotation</SectionEyebrow><h1 className="font-display text-5xl font-bold leading-[0.98] tracking-[-0.07em] sm:text-6xl">Review Your Repair <span className="text-[#B4232C]">Quotation</span></h1><p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-[#77736e] sm:text-lg">Review the customer-safe diagnosis and repair quotation below.</p><span className="mt-6 inline-flex items-center rounded-full bg-[#fff0ef] px-4 py-2 text-xs font-bold text-[#8f1f27]">{statusLabels[quote.status]}</span></div><div className="mx-auto mt-10 grid max-w-5xl gap-5 sm:mt-14 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.9fr)]"><div className="space-y-5"><RequestSummary quote={quote} /><QuotationCard quote={quote} /></div><div className="space-y-5"><DecisionButtons quote={quote} onOpen={setModal} />{quote.status !== "sent" && <div className="rounded-[1.5rem] border border-[#e5e1db] bg-[#252525] p-6 text-white"><p className="text-sm leading-6 text-white/75">This quotation is now in its final state. Approval and decline actions are no longer available.</p></div>}</div></div></>}</main>{modal && <ResponseModal type={modal} onCancel={() => { if (!isSubmitting) setModal(null); }} onConfirm={() => void submitResponse()} isSubmitting={isSubmitting} comment={comment} setComment={setComment} />}</div>;
 }
