@@ -9,7 +9,7 @@ const roleNav: Record<ProfileRole, { label: string; icon: ElementType; href: str
   admin: [
     { label: "Dashboard", icon: Gauge, href: "/app/admin" },
     { label: "User Management", icon: UserRoundCog, href: "/app/admin/users" },
-    { label: "Service Requests", icon: FileText, href: "/app/service-requests" },
+    { label: "Service Requests", icon: FileText, href: "/app/requests" },
     { label: "Customers", icon: Users, href: "/app/customers" },
     { label: "Technicians", icon: Wrench, href: "/app/technicians" },
     { label: "Services & Pricing", icon: Package, href: "/app/admin/services" },
@@ -19,7 +19,7 @@ const roleNav: Record<ProfileRole, { label: string; icon: ElementType; href: str
   ],
   staff: [
     { label: "Dashboard", icon: Gauge, href: "/app/staff" },
-    { label: "Service Requests", icon: FileText, href: "/app/service-requests" },
+    { label: "Service Requests", icon: FileText, href: "/app/requests" },
     { label: "Customers", icon: Users, href: "/app/customers" },
     { label: "Technicians", icon: Wrench, href: "/app/technicians" },
     { label: "Notifications", icon: Bell, href: "/app/notifications" },
@@ -64,7 +64,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mb-3 px-3 text-[0.65rem] font-bold uppercase tracking-[0.2em] text-white/35">{roleLabel} workspace</div>
         <nav className="space-y-1">
           {navItems.map(({ label, icon: Icon, href }) => {
-            const active = location.pathname === href;
+            const active = href === "/app/requests" ? location.pathname.startsWith("/app/requests") : location.pathname === href;
             return (
               <Link
                 key={label}

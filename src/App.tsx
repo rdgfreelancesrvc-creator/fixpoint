@@ -13,6 +13,7 @@ import SetupComplete from "./pages/SetupComplete";
 import AdminDashboard, { AdminSection } from "./pages/AdminDashboard";
 import AdminUsers from "./pages/AdminUsers";
 import AdminServices from "./pages/AdminServices";
+import AdminRequests, { AdminRequestDetail } from "./pages/AdminRequests";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuth } from "./contexts/AuthContext";
@@ -25,6 +26,13 @@ function RoleRedirect() {
   return profile && isProfileRole(profile.role)
     ? <Navigate to={getRolePath(profile.role)} replace />
     : <Navigate to="/login" replace />;
+}
+
+function RequestAccessGate({ children }: { children: React.ReactNode }) {
+  const { profile } = useAuth();
+  if (profile?.role === "technician") return <Navigate to="/app/technician" replace />;
+  if (profile?.role === "admin" || profile?.role === "staff") return children;
+  return <Navigate to="/login" replace />;
 }
 
 const App = () => (
@@ -50,7 +58,9 @@ const App = () => (
           <Route path="/app/admin/services" element={<ProtectedRoute requiredRole="admin"><AdminServices /></ProtectedRoute>} />
           <Route path="/app/staff" element={<ProtectedRoute requiredRole="staff"><AdminDashboard /></ProtectedRoute>} />
           <Route path="/app/technician" element={<ProtectedRoute requiredRole="technician"><AdminDashboard /></ProtectedRoute>} />
-          <Route path="/app/service-requests" element={<ProtectedRoute><AdminSection title="Service Requests" /></ProtectedRoute>} />
+          <Route path="/app/requests/:requestId" element={<ProtectedRoute><RequestAccessGate><AdminRequestDetail /></RequestAccessGate></ProtectedRoute>} />
+          <Route path="/app/requests" element={<ProtectedRoute><RequestAccessGate><AdminRequests /></RequestAccessGate></ProtectedRoute>} />
+          <Route path="/app/service-requests" element={<Navigate to="/app/requests" replace />} />
           <Route path="/app/customers" element={<ProtectedRoute><AdminSection title="Customers" /></ProtectedRoute>} />
           <Route path="/app/technicians" element={<ProtectedRoute><AdminSection title="Technicians" /></ProtectedRoute>} />
           <Route path="/app/services" element={<ProtectedRoute><AdminSection title="Services & Pricing" /></ProtectedRoute>} />

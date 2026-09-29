@@ -1,0 +1,232 @@
+import { supabase } from "@/integrations/supabase/client";
+
+export const requestStatuses = [
+  "received",
+  "diagnosing",
+  "waiting_customer_approval",
+  "approved",
+  "in_repair",
+  "waiting_parts",
+  "ready_for_pickup",
+  "completed",
+  "cancelled",
+] as const;
+
+export type RequestStatus = (typeof requestStatuses)[number];
+
+export const requestStatusLabels: Record<RequestStatus, string> = {
+  received: "Received",
+  diagnosing: "Diagnosing",
+  waiting_customer_approval: "Waiting for Customer Approval",
+  approved: "Approved",
+  in_repair: "In Repair",
+  waiting_parts: "Waiting for Parts",
+  ready_for_pickup: "Ready for Pickup",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+const requestTransitions: Record<RequestStatus, RequestStatus[]> = {
+  received: ["diagnosing", "cancelled"],
+  diagnosing: ["waiting_customer_approval", "in_repair", "waiting_parts", "cancelled"],
+  waiting_customer_approval: ["approved", "cancelled"],
+  approved: ["in_repair", "waiting_parts", "cancelled"],
+  in_repair: ["waiting_parts", "ready_for_pickup", "cancelled"],
+  waiting_parts: ["in_repair", "cancelled"],
+  ready_for_pickup: ["completed"],
+  completed: [],
+  cancelled: [],
+};
+
+export type RequestDateFilter = "all_time" | "today" | "last_7_days" | "last_30_days";
+
+export type ServiceRequestListItem = {
+  id: string;
+  request_number: string;
+  customer_name: string;
+  customer_phone: string;
+  device_type: string;
+  brand: string | null;
+  model: string | null;
+  service_name: string | null;
+  status: RequestStatus;
+  created_at: string;
+  updated_at: string;
+  assigned_technician: null;
+};
+
+export type ServiceRequestAttachment = {
+  id: string;
+  file_name: string;
+  storage_path: string;
+  content_type: string;
+  file_size: number;
+  created_at: string;
+  signed_url?: string;
+};
+
+export type RequestStatusHistoryItem = {
+  id: string;
+  old_status: RequestStatus | null;
+  new_status: RequestStatus;
+  created_at: string;
+  changed_by_name: string | null;
+  changed_by_role: string | null;
+};
+
+export type ServiceRequestDetail = {
+  id: string;
+  request_number: string;
+  status: RequestStatus;
+  created_at: string;
+  updated_at: string;
+  device_type: string;
+  brand: string | null;
+  model: string | null;
+  serial_number: string | null;
+  problem_description: string;
+  contact_email: boolean;
+  contact_sms: boolean;
+  contact_phone: boolean;
+  customer: {
+    id: string;
+    full_name: string;
+    phone: string;
+    email: string | null;
+  };
+  service: {
+    id: string;
+    name: string;
+    category: string;
+  } | null;
+  attachments: ServiceRequestAttachment[];
+  history: RequestStatusHistoryItem[];
+};
+
+type ListResponse = {
+  total_count: number;
+  requests: ServiceRequestListItem[];
+};
+
+export function getAllowedRequestTransitions(status: RequestStatus) {
+  return requestTransitions[status];
+}
+
+export async function listInternalServiceRequests(filters: {
+  search: string;
+  status: RequestStatus | "all";
+  serviceId: string;
+  dateFilter: RequestDateFilter;
+}) {
+  const { data, error } = await supabase.rpc("get_internal_service_requests", {
+    p_search: filters.search.trim() || null,
+    p_status: filters.status === "all" ? null : filters.status,
+    p_service_id: filters.serviceId === "all" ? null : filters.serviceId,
+    p_date_filter: filters.dateFilter,
+    p_limit: 100,
+    p_offset: 0,
+  });
+
+  if (error) throw new Error(error.message);
+  const result = data as ListResponse;
+  return {
+    totalCount: Number(result?.total_count ?? 0),
+    requests: (result?.requests ?? []) as ServiceRequestListItem[],
+  };
+}
+
+export async function getInternalServiceRequest(requestId: string) {
+  const { data, error } = await supabase.rpc("get_internal_service_request", {
+    p_request_id: requestId,
+  });
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Service request not found.");
+  return data as ServiceRequestDetail;
+}
+
+export async function changeServiceRequestStatus(requestId: string, newStatus: RequestStatus) {
+  const { data, error } = await supabase.rpc("change_service_request_status", {
+    p_request_id: requestId,
+    p_new_status: newStatus,
+  });
+
+  if (error) throw new Error(error.message);
+  return data as { id: string; old_status: RequestStatus; new_status: RequestStatus };
+}
+
+export async function createRequestAttachmentUrl(storagePath: string) {
+  const { data, error } = await supabase.storage
+    .from("service-request-attachments")
+    .createSignedUrl(storagePath, 300);
+
+  if (error || !data?.signedUrl) throw new Error(error?.message ?? "Attachment could not be opened.");
+  return data.signedUrl;
+}
+
+export async function getNewRequestsToday() {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const { count, error } = await supabase
+    .from("service_requests")
+    .select("id", { count: "exact", head: true })
+    .gte("created_at", startOfToday.toISOString());
+
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+export type PublicTrackedRequest = {
+  request_number: string;
+  status: RequestStatus;
+  created_at: string;
+  updated_at: string;
+  device_type: string;
+  brand: string | null;
+  model: string | null;
+  serial_number: string | null;
+  service_name: string | null;
+  history: Array<{
+    old_status: RequestStatus | null;
+    new_status: RequestStatus;
+    created_at: string;
+  }>;
+};
+
+export async function trackPublicServiceRequest(requestNumber: string, phone: string) {
+  const { data, error } = await supabase.rpc("get_public_service_request", {
+    p_request_number: requestNumber.trim(),
+    p_phone: phone.trim(),
+  });
+
+  if (error) throw new Error(error.message);
+  return (data as PublicTrackedRequest | null) ?? null;
+}
+
+export function formatRequestStatus(status: RequestStatus) {
+  return requestStatusLabels[status];
+}
+
+export function formatRequestDate(value: string) {
+  return new Intl.DateTimeFormat("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+export function formatRequestDateTime(value: string) {
+  return new Intl.DateTimeFormat("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+export function formatFileSize(size: number) {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
