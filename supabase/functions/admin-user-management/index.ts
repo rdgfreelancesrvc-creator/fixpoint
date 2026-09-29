@@ -19,6 +19,8 @@ const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 })
 
+const employeeInviteRedirectTo = "http://localhost:3000/auth/complete-invite"
+
 type EmployeeRole = "staff" | "technician"
 type Action = "list" | "create" | "update" | "set_status" | "delete"
 
@@ -105,7 +107,8 @@ async function handleRequest(request: Request) {
     if (!isEmployeeRole(body.role)) throw new Error("Choose Staff or Technician for the employee role.")
 
     const { data: invited, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      data: { full_name: fullName, role: body.role },
+      redirectTo: employeeInviteRedirectTo,
+      data: { full_name: fullName, role: body.role, phone },
     })
 
     if (inviteError || !invited.user) throw new Error(inviteError?.message ?? "The employee account could not be created.")
