@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
+import About from "./pages/About";
 import TrackRepair from "./pages/TrackRepair";
 import RequestRepair from "./pages/RequestRepair";
 import QuoteApproval from "./pages/QuoteApproval";
@@ -75,6 +76,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<InviteAwareHome />} />
+          <Route path="/about" element={<About />} />
           <Route path="/track" element={<TrackRepair />} />
           <Route path="/request" element={<RequestRepair />} />
           <Route path="/quote" element={<QuoteApproval />} />

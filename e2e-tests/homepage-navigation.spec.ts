@@ -3,6 +3,13 @@ import { test, expect } from "@playwright/test";
 test("desktop homepage navigation reaches the public destinations", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Reliable repair/ })).toBeVisible();
+
+  await page.getByRole("link", { name: "Learn more" }).first().click();
+  await expect(page).toHaveURL(/\/about$/);
+  await expect(page.getByRole("heading", { name: /A clearer way to get your device/ })).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/$/);
+
   const primaryNavigation = page.getByRole("navigation", { name: "Primary navigation" });
 
   await primaryNavigation.getByRole("link", { name: "Services" }).click();
@@ -14,8 +21,8 @@ test("desktop homepage navigation reaches the public destinations", async ({ pag
   await expect(page.getByRole("heading", { name: /Less guessing/ })).toBeVisible();
 
   await primaryNavigation.getByRole("link", { name: "About" }).click();
-  await expect(page).toHaveURL(/\/#about$/);
-  await expect(page.getByRole("heading", { name: /feel good about/ })).toBeVisible();
+  await expect(page).toHaveURL(/\/about$/);
+  await expect(page.getByRole("heading", { name: /A clearer way to get your device/ })).toBeVisible();
 
   await primaryNavigation.getByRole("link", { name: "Contact" }).click();
   await expect(page).toHaveURL(/\/#contact$/);
@@ -47,7 +54,8 @@ test("desktop homepage navigation reaches the public destinations", async ({ pag
   await footer.getByRole("link", { name: "Services" }).click();
   await expect(page).toHaveURL(/\/#services$/);
   await footer.getByRole("link", { name: "About" }).click();
-  await expect(page).toHaveURL(/\/#about$/);
+  await expect(page).toHaveURL(/\/about$/);
+  await expect(page.getByRole("heading", { name: /A clearer way to get your device/ })).toBeVisible();
   await footer.getByRole("link", { name: "Contact" }).click();
   await expect(page).toHaveURL(/\/#contact$/);
   await footer.getByRole("link", { name: /Staff Login/ }).click();
