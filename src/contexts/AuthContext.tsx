@@ -24,6 +24,7 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const expiredInviteMessage = "This invitation has expired or is no longer valid. Please contact your administrator.";
 
 function readInviteHash(): InviteHash {
   if (typeof window === "undefined") return { isInvite: false, accessToken: null, refreshToken: null };
@@ -75,64 +76,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
+    let isInitializing = true;
+    const inviteHash = readInviteHash();
 
-    const loadSession = async () => {
-      const inviteHash = readInviteHash();
-      let data: { session: Session | null } = { session: null };
-      let error: Error | null = null;
-
-      if (inviteHash.isInvite && inviteHash.accessToken && inviteHash.refreshToken) {
-        const { error: setSessionError } = await supabase.auth.setSession({
-          access_token: inviteHash.accessToken,
-          refresh_token: inviteHash.refreshToken,
-        });
-
-        if (setSessionError) {
-          error = setSessionError;
-        } else {
-          const sessionResult = await supabase.auth.getSession();
-          data = sessionResult.data;
-          error = sessionResult.error;
-        }
-      } else if (!inviteHash.isInvite) {
-        const sessionResult = await supabase.auth.getSession();
-        data = sessionResult.data;
-        error = sessionResult.error;
-      }
-
-      if (inviteHash.isInvite) removeInviteHash();
-      if (!isMounted) return;
-
-      if (error) {
-        setSession(null);
-        setProfile(null);
-        setProfileStatus("error");
-        setProfileError(new Error(error.message));
-        setIsLoading(false);
-        return;
-      }
-
-      setSession(data.session);
-      if (!data.session) {
-        setProfile(null);
-        setProfileStatus("ready");
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        await refreshProfile(data.session.user.id);
-      } catch {
-        // Protected routes remain unavailable when the profile cannot be loaded.
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    };
-
-    void loadSession();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_, nextSession) => {
-      if (!isMounted) return;
+    const handleSessionChange = (_event: string, nextSession: Session | null) => {
+      if (!isMounted || isInitializing) return;
 
       setSession(nextSession);
       if (!nextSession) {
@@ -149,7 +97,82 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .finally(() => {
           if (isMounted) setIsLoading(false);
         });
-    });
+    };
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(handleSessionChange);
+
+    const loadSession = async () => {
+      let nextSession: Session | null = null;
+      let authError: Error | null = null;
+
+      if (inviteHash.isInvite) {
+        if (!inviteHash.accessToken || !inviteHash.refreshToken) {
+          removeInviteHash();
+          authError = new Error(expiredInviteMessage);
+        } else {
+          const { data: setSessionData, error: setSessionError } = await supabase.auth.setSession({
+            access_token: inviteHash.accessToken,
+            refresh_token: inviteHash.refreshToken,
+          });
+
+          if (setSessionError || !setSessionData.session) {
+            removeInviteHash();
+            authError = new Error(setSessionError?.message || expiredInviteMessage);
+          } else {
+            nextSession = setSessionData.session;
+            removeInviteHash();
+
+            const { data: userData, error: userError } = await supabase.auth.getUser();
+            if (userError || !userData.user) {
+              authError = new Error(userError?.message || expiredInviteMessage);
+            } else if (userData.user.id !== nextSession.user.id) {
+              authError = new Error(expiredInviteMessage);
+            }
+          }
+        }
+      } else {
+        const sessionResult = await supabase.auth.getSession();
+        nextSession = sessionResult.data.session;
+        authError = sessionResult.error;
+      }
+
+      if (!isMounted) return;
+
+      if (authError) {
+        setSession(null);
+        setProfile(null);
+        setProfileStatus("error");
+        setProfileError(authError);
+        isInitializing = false;
+        setIsLoading(false);
+        return;
+      }
+
+      setSession(nextSession);
+      if (!nextSession) {
+        setProfile(null);
+        setProfileStatus("ready");
+        setIsLoading(false);
+        isInitializing = false;
+        return;
+      }
+
+      try {
+        const nextProfile = await refreshProfile(nextSession.user.id);
+        if (inviteHash.isInvite && nextProfile?.email && nextSession.user.email && nextProfile.email.trim().toLowerCase() !== nextSession.user.email.trim().toLowerCase()) {
+          setProfile(null);
+          setProfileStatus("missing");
+          setProfileError(new Error(expiredInviteMessage));
+        }
+      } catch {
+        // Protected routes remain unavailable when the profile cannot be loaded.
+      } finally {
+        isInitializing = false;
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    void loadSession();
 
     return () => {
       isMounted = false;
@@ -165,7 +188,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profileError,
     isInviteSession,
     refreshProfile,
-    clearInviteSession: () => setIsInviteSession(false),
+    clearInviteSession: () => {
+      removeInviteHash();
+      setIsInviteSession(false);
+    },
     signOut: async () => {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
