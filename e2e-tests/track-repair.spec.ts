@@ -30,6 +30,11 @@ test("customer can track a real request and sees quotation pending", async ({ pa
   await expect(page.getByText("Received", { exact: true }).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Quotation pending" })).toBeVisible();
   await expect(page.getByText("Repair Quotation")).not.toBeVisible();
+  await expect(page.getByText("Diagnosis", { exact: true })).not.toBeVisible();
+  await expect(page.getByText("Internal Notes", { exact: true })).not.toBeVisible();
+  await expect(page.getByText("Parts & Materials", { exact: true })).not.toBeVisible();
+  await expect(page.getByText("Labor", { exact: true })).not.toBeVisible();
+  await expect(page.getByText("Estimated Repair Cost", { exact: true })).not.toBeVisible();
 });
 
 test("customer sees a helpful message for an invalid repair lookup", async ({ page }) => {

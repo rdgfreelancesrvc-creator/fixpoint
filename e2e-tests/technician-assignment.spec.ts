@@ -15,6 +15,13 @@ test.describe("technician assignment workspaces", () => {
     await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
   });
 
+  test("protects an assigned repair detail from signed-out visitors", async ({ page }) => {
+    await page.goto("/app/my-repairs/not-a-request");
+
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+  });
+
   test("protects the internal technician workload view from signed-out visitors", async ({ page }) => {
     await page.goto("/app/technicians");
 

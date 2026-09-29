@@ -101,6 +101,25 @@ export type AssignmentHistoryItem = {
   created_at: string;
 };
 
+export type RepairPart = {
+  id: string;
+  part_name: string;
+  quantity: number;
+  unit_cost: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RepairLabor = {
+  id: string;
+  description: string;
+  hours: number;
+  hourly_rate: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ServiceRequestDetail = {
   id: string;
   request_number: string;
@@ -112,6 +131,13 @@ export type ServiceRequestDetail = {
   model: string | null;
   serial_number: string | null;
   problem_description: string;
+  diagnosis: string | null;
+  diagnostic_findings: string | null;
+  internal_notes: string | null;
+  parts: RepairPart[];
+  labor: RepairLabor[];
+  parts_subtotal: number;
+  labor_subtotal: number;
   contact_email: boolean;
   contact_sms: boolean;
   contact_phone: boolean;
@@ -153,8 +179,15 @@ export type TechnicianRepair = {
 export type TechnicianRepairDetail = TechnicianRepair & {
   serial_number: string | null;
   problem_description: string;
-  customer: { full_name: string; phone: string; email: string | null };
+  diagnosis: string | null;
+  diagnostic_findings: string | null;
+  internal_notes: string | null;
+  customer: { full_name: string };
   service: { name: string; category: string } | null;
+  parts: RepairPart[];
+  labor: RepairLabor[];
+  parts_subtotal: number;
+  labor_subtotal: number;
   assignment_history: Array<Pick<AssignmentHistoryItem, "id" | "action" | "technician_name" | "assigned_by_name" | "created_at">>;
 };
 
@@ -260,8 +293,77 @@ export async function getTechnicianActiveRepairCount() {
 export async function getTechnicianRepair(requestId: string) {
   const { data, error } = await supabase.rpc("get_technician_service_request", { p_request_id: requestId });
   if (error) throw new Error(error.message);
-  if (!data) throw new Error("Repair not found or no longer assigned to you.");
+  if (!data) throw new Error("Repair not available.");
   return data as TechnicianRepairDetail;
+}
+
+export async function saveTechnicianRepairFields(input: { requestId: string; diagnosis: string; diagnosticFindings: string; internalNotes: string }) {
+  const { data, error } = await supabase.rpc("update_service_request_repair_fields", {
+    p_request_id: input.requestId,
+    p_diagnosis: input.diagnosis,
+    p_diagnostic_findings: input.diagnosticFindings,
+    p_internal_notes: input.internalNotes,
+  });
+  if (error) throw new Error(error.message);
+  return data as { id: string; updated_at: string };
+}
+
+export async function addRepairPart(input: { requestId: string; partName: string; quantity: number; unitCost: number; notes: string }) {
+  const { data, error } = await supabase.rpc("add_service_request_part", {
+    p_request_id: input.requestId,
+    p_part_name: input.partName,
+    p_quantity: input.quantity,
+    p_unit_cost: input.unitCost,
+    p_notes: input.notes || null,
+  });
+  if (error) throw new Error(error.message);
+  return data as { id: string };
+}
+
+export async function updateRepairPart(input: { id: string; partName: string; quantity: number; unitCost: number; notes: string }) {
+  const { data, error } = await supabase.rpc("update_service_request_part", {
+    p_part_id: input.id,
+    p_part_name: input.partName,
+    p_quantity: input.quantity,
+    p_unit_cost: input.unitCost,
+    p_notes: input.notes || null,
+  });
+  if (error) throw new Error(error.message);
+  return data as { id: string };
+}
+
+export async function deleteRepairPart(id: string) {
+  const { data, error } = await supabase.rpc("delete_service_request_part", { p_part_id: id });
+  if (error) throw new Error(error.message);
+  return data as { id: string };
+}
+
+export async function addRepairLabor(input: { requestId: string; description: string; hours: number; hourlyRate: number }) {
+  const { data, error } = await supabase.rpc("add_service_request_labor", {
+    p_request_id: input.requestId,
+    p_description: input.description,
+    p_hours: input.hours,
+    p_hourly_rate: input.hourlyRate,
+  });
+  if (error) throw new Error(error.message);
+  return data as { id: string };
+}
+
+export async function updateRepairLabor(input: { id: string; description: string; hours: number; hourlyRate: number }) {
+  const { data, error } = await supabase.rpc("update_service_request_labor", {
+    p_labor_id: input.id,
+    p_description: input.description,
+    p_hours: input.hours,
+    p_hourly_rate: input.hourlyRate,
+  });
+  if (error) throw new Error(error.message);
+  return data as { id: string };
+}
+
+export async function deleteRepairLabor(id: string) {
+  const { data, error } = await supabase.rpc("delete_service_request_labor", { p_labor_id: id });
+  if (error) throw new Error(error.message);
+  return data as { id: string };
 }
 
 export type PublicTrackedRequest = {
