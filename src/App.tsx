@@ -27,15 +27,28 @@ import { getRolePath, isProfileRole } from "./lib/auth";
 const queryClient = new QueryClient();
 
 function RoleRedirect() {
-  const { profile } = useAuth();
+  const { profile, isInitializingInvite, isInviteSession } = useAuth();
+  if (isInitializingInvite) return <InviteLoadingState />;
+  if (isInviteSession) return <Navigate to="/auth/complete-invite" replace />;
   return profile && isProfileRole(profile.role)
     ? <Navigate to={getRolePath(profile.role)} replace />
     : <Navigate to="/login" replace />;
 }
 
 function InviteAwareHome() {
-  const { isInviteSession } = useAuth();
+  const { isInviteSession, isInitializingInvite } = useAuth();
+  if (isInitializingInvite) return <InviteLoadingState />;
   return isInviteSession ? <Navigate to="/auth/complete-invite" replace /> : <Index />;
+}
+
+function InviteLoadingState() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#f5f4f1] px-5 text-center">
+      <div>
+        <p className="text-sm font-semibold text-[#77736e]">Preparing your FixPoint invitation...</p>
+      </div>
+    </main>
+  );
 }
 
 function RequestAccessGate({ children }: { children: React.ReactNode }) {

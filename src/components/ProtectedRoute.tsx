@@ -16,15 +16,16 @@ function AuthLoadingState() {
 }
 
 export function ProtectedRoute({ children, requiredRole }: { children: ReactNode; requiredRole?: ProfileRole }) {
-  const { session, profile, profileStatus, isLoading, signOut } = useAuth();
+  const { session, profile, profileStatus, isLoading, isInitializingInvite, isInviteSession, signOut } = useAuth();
   const location = useLocation();
-  const needsSignOut = Boolean(session && !isLoading && profileStatus !== "loading" && (!profile || !profile.is_active || !isProfileRole(profile.role)));
+  const needsSignOut = Boolean(!isInitializingInvite && !isInviteSession && session && !isLoading && profileStatus !== "loading" && (!profile || !profile.is_active || !isProfileRole(profile.role)));
 
   useEffect(() => {
     if (needsSignOut) void signOut();
   }, [needsSignOut, signOut]);
 
-  if (isLoading || (session && profileStatus === "loading")) return <AuthLoadingState />;
+  if (isInitializingInvite || isLoading || (session && profileStatus === "loading")) return <AuthLoadingState />;
+  if (isInviteSession) return <Navigate to="/auth/complete-invite" replace />;
   if (!session) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   if (needsSignOut || !profile || !profile.is_active || !isProfileRole(profile.role)) return <AuthLoadingState />;
 

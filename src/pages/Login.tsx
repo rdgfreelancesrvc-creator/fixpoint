@@ -19,7 +19,7 @@ const invalidCredentialsError: LoginError = {
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { session, profile, isLoading, refreshProfile, signOut } = useAuth();
+  const { session, profile, isLoading, isInitializingInvite, isInviteSession, refreshProfile, signOut } = useAuth();
   const inviteSuccess = (location.state as { inviteSuccess?: string } | null)?.inviteSuccess;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,9 +28,14 @@ export default function Login() {
   const [loginError, setLoginError] = useState<LoginError | null>(null);
 
   useEffect(() => {
+    if (isInitializingInvite) return;
+    if (isInviteSession) {
+      navigate("/auth/complete-invite", { replace: true });
+      return;
+    }
     if (isLoading || !session || !profile || !profile.is_active || !isProfileRole(profile.role)) return;
     navigate(getRolePath(profile.role), { replace: true });
-  }, [isLoading, navigate, profile, session]);
+  }, [isInitializingInvite, isInviteSession, isLoading, navigate, profile, session]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

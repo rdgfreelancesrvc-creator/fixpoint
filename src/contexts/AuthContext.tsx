@@ -15,6 +15,7 @@ type AuthContextValue = {
   session: Session | null;
   profile: Profile | null;
   isLoading: boolean;
+  isInitializingInvite: boolean;
   profileStatus: ProfileStatus;
   profileError: Error | null;
   isInviteSession: boolean;
@@ -46,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitializingInvite, setIsInitializingInvite] = useState(() => readInviteHash().isInvite);
   const [profileStatus, setProfileStatus] = useState<ProfileStatus>("loading");
   const [profileError, setProfileError] = useState<Error | null>(null);
   const [isInviteSession, setIsInviteSession] = useState(() => readInviteHash().isInvite);
@@ -103,72 +105,78 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const loadSession = async () => {
       let nextSession: Session | null = null;
+      let authenticatedUserId: string | null = null;
       let authError: Error | null = null;
 
-      if (inviteHash.isInvite) {
-        if (!inviteHash.accessToken || !inviteHash.refreshToken) {
-          removeInviteHash();
-          authError = new Error(expiredInviteMessage);
-        } else {
-          const { data: setSessionData, error: setSessionError } = await supabase.auth.setSession({
-            access_token: inviteHash.accessToken,
-            refresh_token: inviteHash.refreshToken,
-          });
-
-          if (setSessionError || !setSessionData.session) {
+      try {
+        if (inviteHash.isInvite) {
+          if (!inviteHash.accessToken || !inviteHash.refreshToken) {
             removeInviteHash();
-            authError = new Error(setSessionError?.message || expiredInviteMessage);
+            authError = new Error(expiredInviteMessage);
           } else {
-            nextSession = setSessionData.session;
-            removeInviteHash();
+            const { data: setSessionData, error: setSessionError } = await supabase.auth.setSession({
+              access_token: inviteHash.accessToken,
+              refresh_token: inviteHash.refreshToken,
+            });
 
-            const { data: userData, error: userError } = await supabase.auth.getUser();
-            if (userError || !userData.user) {
-              authError = new Error(userError?.message || expiredInviteMessage);
-            } else if (userData.user.id !== nextSession.user.id) {
-              authError = new Error(expiredInviteMessage);
+            if (setSessionError || !setSessionData.session) {
+              removeInviteHash();
+              authError = new Error(setSessionError?.message || expiredInviteMessage);
+            } else {
+              nextSession = setSessionData.session;
+              removeInviteHash();
+
+              const { data: userData, error: userError } = await supabase.auth.getUser();
+              if (userError || !userData.user) {
+                authError = new Error(userError?.message || expiredInviteMessage);
+              } else if (userData.user.id !== nextSession.user.id) {
+                authError = new Error(expiredInviteMessage);
+              } else {
+                authenticatedUserId = userData.user.id;
+              }
             }
           }
+        } else {
+          const sessionResult = await supabase.auth.getSession();
+          nextSession = sessionResult.data.session;
+          authError = sessionResult.error;
         }
-      } else {
-        const sessionResult = await supabase.auth.getSession();
-        nextSession = sessionResult.data.session;
-        authError = sessionResult.error;
-      }
 
-      if (!isMounted) return;
+        if (!isMounted) return;
 
-      if (authError) {
-        setSession(null);
-        setProfile(null);
-        setProfileStatus("error");
-        setProfileError(authError);
-        isInitializing = false;
-        setIsLoading(false);
-        return;
-      }
+        if (authError) {
+          setSession(null);
+          setProfile(null);
+          setProfileStatus("error");
+          setProfileError(authError);
+          return;
+        }
 
-      setSession(nextSession);
-      if (!nextSession) {
-        setProfile(null);
-        setProfileStatus("ready");
-        setIsLoading(false);
-        isInitializing = false;
-        return;
-      }
+        setSession(nextSession);
+        if (!nextSession) {
+          setProfile(null);
+          setProfileStatus("ready");
+          return;
+        }
 
-      try {
-        const nextProfile = await refreshProfile(nextSession.user.id);
-        if (inviteHash.isInvite && nextProfile?.email && nextSession.user.email && nextProfile.email.trim().toLowerCase() !== nextSession.user.email.trim().toLowerCase()) {
+        const nextProfile = await refreshProfile(authenticatedUserId || nextSession.user.id);
+        if (inviteHash.isInvite && (!nextProfile || nextProfile.id !== authenticatedUserId)) {
           setProfile(null);
           setProfileStatus("missing");
           setProfileError(new Error(expiredInviteMessage));
         }
-      } catch {
-        // Protected routes remain unavailable when the profile cannot be loaded.
+      } catch (error) {
+        if (!isMounted) return;
+        setSession(null);
+        setProfile(null);
+        setProfileStatus("error");
+        setProfileError(error instanceof Error ? error : new Error(expiredInviteMessage));
       } finally {
         isInitializing = false;
-        if (isMounted) setIsLoading(false);
+        if (isMounted) {
+          setIsInitializingInvite(false);
+          setIsLoading(false);
+        }
       }
     };
 
@@ -184,6 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     profile,
     isLoading,
+    isInitializingInvite,
     profileStatus,
     profileError,
     isInviteSession,
@@ -196,7 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     },
-  }), [isInviteSession, isLoading, profile, profileError, profileStatus, session]);
+  }), [isInitializingInvite, isInviteSession, isLoading, profile, profileError, profileStatus, session]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

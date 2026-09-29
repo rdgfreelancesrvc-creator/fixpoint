@@ -9,7 +9,7 @@ const expiredInviteMessage = "This invitation has expired or is no longer valid.
 
 export default function CompleteInvite() {
   const navigate = useNavigate();
-  const { session, profile, isLoading, profileStatus, isInviteSession, refreshProfile, clearInviteSession } = useAuth();
+  const { session, profile, isLoading, isInitializingInvite, profileStatus, isInviteSession, refreshProfile, clearInviteSession } = useAuth();
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -73,7 +73,7 @@ export default function CompleteInvite() {
     }
   };
 
-  const isPreparing = isLoading || profileStatus === "loading";
+  const isPreparing = isInitializingInvite || isLoading || profileStatus === "loading";
   const hasInvalidInvite = !isInviteSession || !session;
   const hasMissingProfile = Boolean(session && !isPreparing && !profile);
   const email = profile?.email || session?.user.email || "Not available";
@@ -95,8 +95,8 @@ export default function CompleteInvite() {
           ) : (
             <>
               <div className="mb-8 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f3c7c6] text-[#8f1f27]"><KeyRound size={26} /></div>
-              <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-[#B4232C]">Employee account setup</p>
-              <h1 className="font-display text-3xl font-bold tracking-[-0.06em] sm:text-4xl">Complete your FixPoint account</h1>
+              <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-[#B4232C]">FixPoint</p>
+              <h1 className="font-display text-3xl font-bold tracking-[-0.06em] sm:text-4xl">Complete Your Account</h1>
               <p className="mt-3 text-sm leading-6 text-[#77736e]">Your administrator created this employee account. Choose a password to finish setup and sign in to your assigned workspace.</p>
 
               <div className="mt-7 grid gap-3 rounded-2xl border border-[#eeeae5] bg-[#fbfaf8] p-4 sm:grid-cols-2">
