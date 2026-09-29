@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
   Check,
@@ -200,7 +201,8 @@ function NotFoundResult() {
 }
 
 export default function TrackRepair() {
-  const [values, setValues] = useState<SearchValues>({ requestNumber: "", mobileNumber: "" });
+  const [searchParams] = useSearchParams();
+  const [values, setValues] = useState<SearchValues>(() => ({ requestNumber: searchParams.get("requestNumber") ?? "", mobileNumber: "" }));
   const [hasSearched, setHasSearched] = useState(false);
   const [isMatch, setIsMatch] = useState(false);
 
