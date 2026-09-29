@@ -8,6 +8,7 @@ import TrackRepair from "./pages/TrackRepair";
 import RequestRepair from "./pages/RequestRepair";
 import QuoteApproval from "./pages/QuoteApproval";
 import Login from "./pages/Login";
+import CompleteInvite from "./pages/CompleteInvite";
 import Setup from "./pages/Setup";
 import SetupComplete from "./pages/SetupComplete";
 import AdminDashboard, { AdminSection } from "./pages/AdminDashboard";
@@ -32,6 +33,11 @@ function RoleRedirect() {
     : <Navigate to="/login" replace />;
 }
 
+function InviteAwareHome() {
+  const { isInviteSession } = useAuth();
+  return isInviteSession ? <Navigate to="/auth/complete-invite" replace /> : <Index />;
+}
+
 function RequestAccessGate({ children }: { children: React.ReactNode }) {
   const { profile } = useAuth();
   if (profile?.role === "technician") return <Navigate to="/app/technician" replace />;
@@ -53,11 +59,12 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
+          <Route path="/" element={<InviteAwareHome />} />
           <Route path="/track" element={<TrackRepair />} />
           <Route path="/request" element={<RequestRepair />} />
           <Route path="/quote" element={<QuoteApproval />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/auth/complete-invite" element={<CompleteInvite />} />
           <Route path="/setup" element={<Setup />} />
           <Route path="/setup/complete" element={<SetupComplete />} />
           <Route path="/staff" element={<Navigate to="/login" replace />} />

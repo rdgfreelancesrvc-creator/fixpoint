@@ -5,17 +5,41 @@ import type { Profile } from "@/lib/auth";
 
 type ProfileStatus = "loading" | "ready" | "missing" | "error";
 
+type InviteHash = {
+  isInvite: boolean;
+  accessToken: string | null;
+  refreshToken: string | null;
+};
+
 type AuthContextValue = {
   session: Session | null;
   profile: Profile | null;
   isLoading: boolean;
   profileStatus: ProfileStatus;
   profileError: Error | null;
+  isInviteSession: boolean;
   refreshProfile: (userId: string) => Promise<Profile | null>;
+  clearInviteSession: () => void;
   signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+function readInviteHash(): InviteHash {
+  if (typeof window === "undefined") return { isInvite: false, accessToken: null, refreshToken: null };
+
+  const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  return {
+    isInvite: params.get("type") === "invite",
+    accessToken: params.get("access_token"),
+    refreshToken: params.get("refresh_token"),
+  };
+}
+
+function removeInviteHash() {
+  if (typeof window === "undefined" || !window.location.hash) return;
+  window.history.replaceState(null, document.title, `${window.location.pathname}${window.location.search}`);
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -23,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [profileStatus, setProfileStatus] = useState<ProfileStatus>("loading");
   const [profileError, setProfileError] = useState<Error | null>(null);
+  const [isInviteSession, setIsInviteSession] = useState(() => readInviteHash().isInvite);
 
   const refreshProfile = async (userId: string) => {
     setProfileStatus("loading");
@@ -52,10 +77,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let isMounted = true;
 
     const loadSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
+      const inviteHash = readInviteHash();
+      let data: { session: Session | null } = { session: null };
+      let error: Error | null = null;
+
+      if (inviteHash.isInvite && inviteHash.accessToken && inviteHash.refreshToken) {
+        const { error: setSessionError } = await supabase.auth.setSession({
+          access_token: inviteHash.accessToken,
+          refresh_token: inviteHash.refreshToken,
+        });
+
+        if (setSessionError) {
+          error = setSessionError;
+        } else {
+          const sessionResult = await supabase.auth.getSession();
+          data = sessionResult.data;
+          error = sessionResult.error;
+        }
+      } else if (!inviteHash.isInvite) {
+        const sessionResult = await supabase.auth.getSession();
+        data = sessionResult.data;
+        error = sessionResult.error;
+      }
+
+      if (inviteHash.isInvite) removeInviteHash();
       if (!isMounted) return;
 
       if (error) {
+        setSession(null);
         setProfile(null);
         setProfileStatus("error");
         setProfileError(new Error(error.message));
@@ -114,12 +163,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading,
     profileStatus,
     profileError,
+    isInviteSession,
     refreshProfile,
+    clearInviteSession: () => setIsInviteSession(false),
     signOut: async () => {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     },
-  }), [isLoading, profile, profileError, profileStatus, session]);
+  }), [isInviteSession, isLoading, profile, profileError, profileStatus, session]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

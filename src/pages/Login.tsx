@@ -1,6 +1,6 @@
 import { Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { BrandMark } from "@/components/BrandMark";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,7 +18,9 @@ const invalidCredentialsError: LoginError = {
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { session, profile, isLoading, refreshProfile, signOut } = useAuth();
+  const inviteSuccess = (location.state as { inviteSuccess?: string } | null)?.inviteSuccess;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -125,6 +127,8 @@ export default function Login() {
               <h2 className="font-display text-3xl font-bold tracking-[-0.06em] sm:text-4xl">Welcome back</h2>
               <p className="mt-3 text-sm leading-6 text-[#77736e]">Sign in to your FixPoint workspace</p>
             </div>
+
+            {inviteSuccess && <div role="status" className="mt-6 rounded-xl border border-[#d9eadc] bg-[#f3fbf4] px-4 py-3 text-sm font-semibold leading-6 text-[#267342]">{inviteSuccess}</div>}
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-5" noValidate>
               <div>
