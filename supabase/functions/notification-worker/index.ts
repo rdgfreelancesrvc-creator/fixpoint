@@ -11,6 +11,7 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? ""
 const resendApiKey = Deno.env.get("RESEND_API_KEY") ?? ""
+const resendFromEmail = Deno.env.get("RESEND_FROM_EMAIL")?.trim() ?? ""
 const semaphoreApiKey = Deno.env.get("SEMAPHORE_API_KEY") ?? ""
 const appUrl = (Deno.env.get("APP_URL") ?? "http://localhost:5173").replace(/\/$/, "")
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
@@ -62,6 +63,7 @@ function publicSettings(settings: Settings) {
   for (const [key, value] of Object.entries(settings)) {
     if (!key.includes("api_key") && key !== "id" && key !== "created_at" && key !== "updated_at") result[key] = value
   }
+  result.resend_from_email = resendFromEmail || null
   result.resend_configured = Boolean(resendApiKey)
   result.semaphore_configured = Boolean(semaphoreApiKey)
   return result
@@ -69,8 +71,8 @@ function publicSettings(settings: Settings) {
 
 async function sendEmail(settings: Settings, recipient: string, subject: string, html: string) {
   if (!resendApiKey) throw new Error("RESEND_API_KEY is not configured on the server.")
-  if (!settings.resend_from_email) throw new Error("A Resend From Email must be configured.")
-  const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: `${settings.resend_from_name} <${settings.resend_from_email}>`, to: [recipient], reply_to: settings.resend_reply_to || undefined, subject, html }) })
+  if (!resendFromEmail) throw new Error("RESEND_FROM_EMAIL is not configured on the server.")
+  const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: `${settings.resend_from_name} <${resendFromEmail}>`, to: [recipient], reply_to: settings.resend_reply_to || undefined, subject, html }) })
   const body = await response.json().catch(() => ({})) as { id?: string; message?: string }
   if (!response.ok) throw new Error(body.message || `Resend returned HTTP ${response.status}.`)
   return body.id ?? null
@@ -181,7 +183,7 @@ async function handleRequest(request: Request) {
   if (action === "get_settings") { await requireActor(request, true); return jsonResponse({ settings: publicSettings(await getSettings()) }) }
   if (action === "save_settings") {
     await requireActor(request, true)
-    const allowed = ["email_enabled", "sms_enabled", "resend_from_name", "resend_from_email", "resend_reply_to", "semaphore_sender_name", ...["repair_request_received", "technician_assigned", "quotation_ready", "quotation_approved", "quotation_declined", "repair_status_changed", "ready_for_pickup", "repair_completed"].flatMap((type) => [`email_${type}`, `sms_${type}`])]
+    const allowed = ["email_enabled", "sms_enabled", "resend_from_name", "resend_reply_to", "semaphore_sender_name", ...["repair_request_received", "technician_assigned", "quotation_ready", "quotation_approved", "quotation_declined", "repair_status_changed", "ready_for_pickup", "repair_completed"].flatMap((type) => [`email_${type}`, `sms_${type}`])]
     const update: Record<string, unknown> = {}
     for (const key of allowed) if (key in (body.settings ?? {})) update[key] = body.settings?.[key]
     update.updated_at = new Date().toISOString()
