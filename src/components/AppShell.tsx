@@ -23,6 +23,7 @@ const roleNav: Record<ProfileRole, { label: string; icon: ElementType; href: str
     { label: "Customers", icon: Users, href: "/app/customers" },
     { label: "Technicians", icon: Wrench, href: "/app/technicians" },
     { label: "Notifications", icon: Bell, href: "/app/admin/notifications" },
+    { label: "Reports", icon: MonitorCog, href: "/app/reports" },
   ],
   technician: [
     { label: "Dashboard", icon: Gauge, href: "/app/technician" },

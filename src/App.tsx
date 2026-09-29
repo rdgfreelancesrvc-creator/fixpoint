@@ -19,6 +19,7 @@ import AdminTechnicians from "./pages/AdminTechnicians";
 import AdminNotifications from "./pages/AdminNotifications";
 import AdminNotificationSettings from "./pages/AdminNotificationSettings";
 import AdminCustomers, { AdminCustomerDetail } from "./pages/AdminCustomers";
+import Reports from "./pages/Reports";
 import { TechnicianDashboard, TechnicianRepairDetail, TechnicianRepairs } from "./pages/TechnicianWorkspace";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -103,7 +104,7 @@ const App = () => (
           <Route path="/app/admin/notifications" element={<ProtectedRoute><AdminStaffAccessGate><AdminNotifications /></AdminStaffAccessGate></ProtectedRoute>} />
           <Route path="/app/admin/settings" element={<ProtectedRoute requiredRole="admin"><AdminNotificationSettings /></ProtectedRoute>} />
           <Route path="/app/notifications" element={<Navigate to="/app/admin/notifications" replace />} />
-          <Route path="/app/reports" element={<ProtectedRoute><AdminSection title="Reports" /></ProtectedRoute>} />
+          <Route path="/app/reports" element={<ProtectedRoute><AdminStaffAccessGate><Reports /></AdminStaffAccessGate></ProtectedRoute>} />
           <Route path="/app/settings" element={<Navigate to="/app/admin/settings" replace />} />
           <Route path="/app/my-repairs" element={<ProtectedRoute><AdminSection title="My Repairs" /></ProtectedRoute>} />
           <Route path="/app/*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
