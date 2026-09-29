@@ -18,6 +18,7 @@ import AdminRequests, { AdminRequestDetail } from "./pages/AdminRequests";
 import AdminTechnicians from "./pages/AdminTechnicians";
 import AdminNotifications from "./pages/AdminNotifications";
 import AdminNotificationSettings from "./pages/AdminNotificationSettings";
+import AdminCustomers, { AdminCustomerDetail } from "./pages/AdminCustomers";
 import { TechnicianDashboard, TechnicianRepairDetail, TechnicianRepairs } from "./pages/TechnicianWorkspace";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -95,7 +96,8 @@ const App = () => (
           <Route path="/app/requests/:requestId" element={<ProtectedRoute><RequestAccessGate><AdminRequestDetail /></RequestAccessGate></ProtectedRoute>} />
           <Route path="/app/requests" element={<ProtectedRoute><RequestAccessGate><AdminRequests /></RequestAccessGate></ProtectedRoute>} />
           <Route path="/app/service-requests" element={<Navigate to="/app/requests" replace />} />
-          <Route path="/app/customers" element={<ProtectedRoute><AdminSection title="Customers" /></ProtectedRoute>} />
+          <Route path="/app/customers/:customerId" element={<ProtectedRoute><AdminStaffAccessGate><AdminCustomerDetail /></AdminStaffAccessGate></ProtectedRoute>} />
+          <Route path="/app/customers" element={<ProtectedRoute><AdminStaffAccessGate><AdminCustomers /></AdminStaffAccessGate></ProtectedRoute>} />
           <Route path="/app/technicians" element={<ProtectedRoute><AdminStaffAccessGate><AdminTechnicians /></AdminStaffAccessGate></ProtectedRoute>} />
           <Route path="/app/services" element={<ProtectedRoute><AdminSection title="Services & Pricing" /></ProtectedRoute>} />
           <Route path="/app/admin/notifications" element={<ProtectedRoute><AdminStaffAccessGate><AdminNotifications /></AdminStaffAccessGate></ProtectedRoute>} />
