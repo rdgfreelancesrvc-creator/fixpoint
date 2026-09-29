@@ -8,6 +8,8 @@ import TrackRepair from "./pages/TrackRepair";
 import RequestRepair from "./pages/RequestRepair";
 import QuoteApproval from "./pages/QuoteApproval";
 import Login from "./pages/Login";
+import Setup from "./pages/Setup";
+import SetupComplete from "./pages/SetupComplete";
 import AdminDashboard, { AdminSection } from "./pages/AdminDashboard";
 import AdminUsers from "./pages/AdminUsers";
 import AdminServices from "./pages/AdminServices";
@@ -37,6 +39,8 @@ const App = () => (
           <Route path="/request" element={<RequestRepair />} />
           <Route path="/quote" element={<QuoteApproval />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/setup" element={<Setup />} />
+          <Route path="/setup/complete" element={<SetupComplete />} />
           <Route path="/staff" element={<Navigate to="/login" replace />} />
 
           <Route path="/app" element={<ProtectedRoute><RoleRedirect /></ProtectedRoute>} />
