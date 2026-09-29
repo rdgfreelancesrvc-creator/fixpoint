@@ -109,6 +109,11 @@ async function handleRequest(request: Request) {
     }
   }
 
+  const { error: notificationError } = await supabaseAdmin.functions.invoke("notification-worker", {
+    body: { action: "process" },
+  })
+  if (notificationError) console.error(`[${functionName}] notification processing failed`, { error: notificationError.message })
+
   console.info(`[${functionName}] request submitted`, { requestId: result.id, requestNumber: result.request_number, attachmentFailures: attachmentErrors.length })
   return jsonResponse({ request: { request_number: result.request_number }, attachmentErrors }, 201)
 }

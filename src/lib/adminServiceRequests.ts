@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { triggerNotificationProcessing } from "@/lib/notifications";
 
 export const requestStatuses = [
   "received",
@@ -244,6 +245,7 @@ export async function assignServiceRequest(requestId: string, technicianId: stri
   });
 
   if (error) throw new Error(error.message);
+  triggerNotificationProcessing();
   return data as { id: string; assigned_technician_id: string | null; action: "assigned" | "reassigned" | "unassigned" };
 }
 
@@ -254,6 +256,7 @@ export async function changeServiceRequestStatus(requestId: string, newStatus: R
   });
 
   if (error) throw new Error(error.message);
+  triggerNotificationProcessing();
   return data as { id: string; old_status: RequestStatus; new_status: RequestStatus };
 }
 

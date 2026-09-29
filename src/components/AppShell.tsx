@@ -13,22 +13,20 @@ const roleNav: Record<ProfileRole, { label: string; icon: ElementType; href: str
     { label: "Customers", icon: Users, href: "/app/customers" },
     { label: "Technicians", icon: Wrench, href: "/app/technicians" },
     { label: "Services & Pricing", icon: Package, href: "/app/admin/services" },
-    { label: "Notifications", icon: Bell, href: "/app/notifications" },
+    { label: "Notifications", icon: Bell, href: "/app/admin/notifications" },
     { label: "Reports", icon: MonitorCog, href: "/app/reports" },
-    { label: "Settings", icon: Settings, href: "/app/settings" },
+    { label: "Settings", icon: Settings, href: "/app/admin/settings" },
   ],
   staff: [
     { label: "Dashboard", icon: Gauge, href: "/app/staff" },
     { label: "Service Requests", icon: FileText, href: "/app/requests" },
     { label: "Customers", icon: Users, href: "/app/customers" },
     { label: "Technicians", icon: Wrench, href: "/app/technicians" },
-    { label: "Notifications", icon: Bell, href: "/app/notifications" },
+    { label: "Notifications", icon: Bell, href: "/app/admin/notifications" },
   ],
   technician: [
     { label: "Dashboard", icon: Gauge, href: "/app/technician" },
     { label: "My Repairs", icon: Laptop, href: "/app/my-repairs" },
-    { label: "Notifications", icon: Bell, href: "/app/notifications" },
-    { label: "Settings", icon: Settings, href: "/app/settings" },
   ],
 };
 

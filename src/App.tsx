@@ -15,6 +15,8 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminServices from "./pages/AdminServices";
 import AdminRequests, { AdminRequestDetail } from "./pages/AdminRequests";
 import AdminTechnicians from "./pages/AdminTechnicians";
+import AdminNotifications from "./pages/AdminNotifications";
+import AdminNotificationSettings from "./pages/AdminNotificationSettings";
 import { TechnicianDashboard, TechnicianRepairDetail, TechnicianRepairs } from "./pages/TechnicianWorkspace";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -75,9 +77,11 @@ const App = () => (
           <Route path="/app/customers" element={<ProtectedRoute><AdminSection title="Customers" /></ProtectedRoute>} />
           <Route path="/app/technicians" element={<ProtectedRoute><AdminStaffAccessGate><AdminTechnicians /></AdminStaffAccessGate></ProtectedRoute>} />
           <Route path="/app/services" element={<ProtectedRoute><AdminSection title="Services & Pricing" /></ProtectedRoute>} />
-          <Route path="/app/notifications" element={<ProtectedRoute><AdminSection title="Notifications" /></ProtectedRoute>} />
+          <Route path="/app/admin/notifications" element={<ProtectedRoute><AdminStaffAccessGate><AdminNotifications /></AdminStaffAccessGate></ProtectedRoute>} />
+          <Route path="/app/admin/settings" element={<ProtectedRoute requiredRole="admin"><AdminNotificationSettings /></ProtectedRoute>} />
+          <Route path="/app/notifications" element={<Navigate to="/app/admin/notifications" replace />} />
           <Route path="/app/reports" element={<ProtectedRoute><AdminSection title="Reports" /></ProtectedRoute>} />
-          <Route path="/app/settings" element={<ProtectedRoute><AdminSection title="Settings" /></ProtectedRoute>} />
+          <Route path="/app/settings" element={<Navigate to="/app/admin/settings" replace />} />
           <Route path="/app/my-repairs" element={<ProtectedRoute><AdminSection title="My Repairs" /></ProtectedRoute>} />
           <Route path="/app/*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />

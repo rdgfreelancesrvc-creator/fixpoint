@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { triggerNotificationProcessing } from "@/lib/notifications";
 
 export type QuotationStatus = "draft" | "sent" | "approved" | "declined" | "expired" | "cancelled";
 export type QuotationItemType = "part" | "labor" | "service";
@@ -96,6 +97,7 @@ export async function updateDraftQuotation(input: { quotationId: string; diagnos
 export async function sendQuotation(quotationId: string) {
   const { data, error } = await supabase.rpc("send_service_request_quotation", { p_quotation_id: quotationId });
   if (error) throw new Error(error.message);
+  triggerNotificationProcessing();
   return data as QuotationSendResult;
 }
 
@@ -126,6 +128,7 @@ export async function respondToQuotation(input: { token: string; response: "appr
     p_customer_comment: input.customerComment || null,
   });
   if (error) throw new Error(error.message);
+  triggerNotificationProcessing();
   return data as { quotation_number: string; status: QuotationStatus; request_status?: string; already_responded: boolean; response_id?: string };
 }
 
