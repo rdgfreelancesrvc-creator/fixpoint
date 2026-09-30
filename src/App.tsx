@@ -27,7 +27,13 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuth } from "./contexts/AuthContext";
 import { getRolePath, isProfileRole } from "./lib/auth";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function RoleRedirect() {
   const { profile, isInitializingInvite, isInviteSession } = useAuth();

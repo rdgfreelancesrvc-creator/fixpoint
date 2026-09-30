@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Profile } from "@/lib/auth";
@@ -77,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileError, setProfileError] = useState<Error | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(initialInviteUrl.errorMessage);
   const [isInviteSession, setIsInviteSession] = useState(initialInviteUrl.isInvite);
+  const sessionUserIdRef = useRef<string | null>(null);
 
   const refreshProfile = async (userId: string) => {
     setProfileStatus("loading");
@@ -110,6 +111,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleSessionChange = (_event: string, nextSession: Session | null) => {
       if (!isMounted) return;
 
+      const nextUserId = nextSession?.user.id ?? null;
+      const previousUserId = sessionUserIdRef.current;
+      sessionUserIdRef.current = nextUserId;
       setSession(nextSession);
       if (isInitializing) return;
 
@@ -117,16 +121,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(null);
         setProfileStatus("ready");
         setProfileError(null);
-        setIsLoading(false);
         return;
       }
 
-      setIsLoading(true);
-      void refreshProfile(nextSession.user.id)
-        .catch(() => undefined)
-        .finally(() => {
-          if (isMounted) setIsLoading(false);
-        });
+      if (nextUserId === previousUserId) return;
+
+      setProfile(null);
+      setProfileStatus("loading");
+      setProfileError(null);
+      window.setTimeout(() => {
+        if (!isMounted || sessionUserIdRef.current !== nextUserId) return;
+        void refreshProfile(nextUserId).catch(() => undefined);
+      }, 0);
     };
 
     const { data: authListener } = supabase.auth.onAuthStateChange(handleSessionChange);
@@ -185,6 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!isMounted) return;
 
         if (authError) {
+          sessionUserIdRef.current = null;
           setSession(null);
           setProfile(null);
           setProfileStatus("error");
@@ -193,6 +200,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        const nextUserId = authenticatedUserId || nextSession?.user.id || null;
+        sessionUserIdRef.current = nextUserId;
         setSession(nextSession);
         if (!nextSession) {
           setProfile(null);
@@ -200,13 +209,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const nextProfile = await refreshProfile(authenticatedUserId || nextSession.user.id);
+        const nextProfile = await refreshProfile(nextUserId);
         if (inviteUrl.isInvite && !nextProfile) {
           setInviteError("Your FixPoint employee profile could not be found. Please request a new invitation from your administrator.");
         }
       } catch (error) {
         if (!isMounted) return;
         const nextError = error instanceof Error ? error : new Error(expiredInviteMessage);
+        sessionUserIdRef.current = null;
         setSession(null);
         setProfile(null);
         setProfileStatus("error");
