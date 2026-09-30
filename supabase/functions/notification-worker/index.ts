@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0"
+import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts"
 
 const functionName = "notification-worker"
 const corsHeaders = {
@@ -12,6 +13,8 @@ const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? ""
 const resendApiKey = Deno.env.get("RESEND_API_KEY") ?? ""
 const resendFromEmail = Deno.env.get("RESEND_FROM_EMAIL")?.trim() ?? ""
+const gmailUser = Deno.env.get("GMAIL_USER")?.trim() ?? ""
+const gmailAppPassword = Deno.env.get("GMAIL_APP_PASSWORD")?.trim() ?? ""
 const semaphoreApiKey = Deno.env.get("SEMAPHORE_API_KEY") ?? ""
 const appUrl = (Deno.env.get("APP_URL") ?? "http://localhost:5173").replace(/\/$/, "")
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
@@ -69,7 +72,25 @@ function publicSettings(settings: Settings) {
   return result
 }
 
+function emailProvider() { return gmailUser && gmailAppPassword ? "gmail" : "Resend" }
+
 async function sendEmail(settings: Settings, recipient: string, subject: string, html: string) {
+  if (gmailUser && gmailAppPassword) {
+    const client = new SmtpClient()
+    try {
+      await client.connectTLS({ hostname: "smtp.gmail.com", port: 465, username: gmailUser, password: gmailAppPassword })
+      await client.send({
+        from: `${settings.resend_from_name} <${gmailUser}>`,
+        to: recipient,
+        subject,
+        content: html,
+        replyTo: settings.resend_reply_to || undefined,
+      })
+      return null
+    } finally {
+      await client.close()
+    }
+  }
   if (!resendApiKey) throw new Error("RESEND_API_KEY is not configured on the server.")
   if (!resendFromEmail) throw new Error("RESEND_FROM_EMAIL is not configured on the server.")
   const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: `${settings.resend_from_name} <${resendFromEmail}>`, to: [recipient], reply_to: settings.resend_reply_to || undefined, subject, html }) })
@@ -78,7 +99,7 @@ async function sendEmail(settings: Settings, recipient: string, subject: string,
   return body.id ?? null
 }
 async function sendSms(settings: Settings, recipient: string, message: string) {
-  if (!semaphoreApiKey) throw new Error("SEMAPHORE_API_KEY is not configured on the server.")
+  if (!semaphoreApiKey) return null
   const form = new URLSearchParams({ apikey: semaphoreApiKey, number: recipient, message, sendername: settings.semaphore_sender_name })
   const response = await fetch("https://api.semaphore.co/api/v4/messages", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form })
   const body = await response.json().catch(() => ({})) as Array<{ message_id?: string; id?: string; message?: string }> | { message?: string }
@@ -131,17 +152,17 @@ async function processEvent(event: EventRow) {
     const enabled = Boolean(settings[`${channel}_enabled`]) && Boolean(settings[preferenceKey(channel, event.notification_type)])
     const customerEnabled = channel === "email" ? requestRecord.contact_email : requestRecord.contact_sms
     const recipient = channel === "email" ? requestRecord.customer?.email : requestRecord.customer?.phone
+    const provider = channel === "email" ? emailProvider() : semaphoreApiKey ? "Semaphore" : "mock"
     if (!enabled || !customerEnabled || !recipient) {
-      if (recipient) await logDelivery(event, requestRecord, channel, recipient, channel === "email" ? content.subject : null, channel === "email" ? content.subject : content.sms, channel === "email" ? "Resend" : "Semaphore", "failed", null, !enabled ? "Skipped: disabled by notification settings." : !customerEnabled ? "Skipped: customer disabled this channel for the request." : "Skipped: customer has no contact address.")
+      if (recipient) await logDelivery(event, requestRecord, channel, recipient, channel === "email" ? content.subject : null, channel === "email" ? content.subject : content.sms, provider, "failed", null, !enabled ? "Skipped: disabled by notification settings." : !customerEnabled ? "Skipped: customer disabled this channel for the request." : "Skipped: customer has no contact address.")
       continue
     }
     try {
-      const provider = channel === "email" ? "Resend" : "Semaphore"
       const providerMessageId = channel === "email" ? await sendEmail(settings, recipient, content.subject, content.html) : await sendSms(settings, recipient, content.sms)
       await logDelivery(event, requestRecord, channel, recipient, channel === "email" ? content.subject : null, channel === "email" ? content.subject : content.sms, provider, "sent", providerMessageId, null)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Provider delivery failed."
-      await logDelivery(event, requestRecord, channel, recipient, channel === "email" ? content.subject : null, channel === "email" ? content.subject : content.sms, channel === "email" ? "Resend" : "Semaphore", "failed", null, message)
+      await logDelivery(event, requestRecord, channel, recipient, channel === "email" ? content.subject : null, channel === "email" ? content.subject : content.sms, provider, "failed", null, message)
     }
   }
 }
@@ -170,7 +191,13 @@ async function testEmail(settings: Settings, recipient: string) {
   const html = `<div style="font-family:Arial,sans-serif;color:#252525;padding:24px"><strong style="color:#B4232C">FixPoint</strong><h1>Test email sent successfully.</h1><p>Email delivery is working.</p></div>`
   return sendEmail(settings, recipient, subject, html)
 }
-async function testSms(settings: Settings, recipient: string) { return sendSms(settings, recipient, "FixPoint notification test: SMS delivery is working.") }
+async function testSms(settings: Settings, recipient: string) {
+  const message = "FixPoint notification test: SMS delivery is working."
+  if (semaphoreApiKey) return sendSms(settings, recipient, message)
+  const { error } = await supabaseAdmin.from("notification_logs").insert({ channel: "sms", notification_type: "test_sms", recipient, subject: null, message: safeMessageForLog(message), provider: "mock", provider_message_id: null, status: "sent", error_message: null, sent_at: new Date().toISOString() })
+  if (error) throw new Error(error.message)
+  return null
+}
 
 async function handleRequest(request: Request) {
   const body = await request.json().catch(() => ({})) as { action?: string; event_id?: string; recipient?: string; settings?: Record<string, unknown> }
