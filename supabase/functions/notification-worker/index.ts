@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0"
-import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts"
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts"
 
 const functionName = "notification-worker"
 const corsHeaders = {
@@ -42,6 +42,13 @@ function statusLabel(status: string) {
 }
 function preferenceKey(channel: Channel, type: NotificationType) { return `${channel}_${type}` }
 function safeMessageForLog(message: string) { return message.replace(/https?:\/\/[^\s]+/g, "[secure link]") }
+function safeErrorMessage(error: unknown) {
+  let message = error instanceof Error ? error.message : "The notification request could not be completed."
+  for (const secret of [serviceRoleKey, supabaseAnonKey, resendApiKey, gmailUser, gmailAppPassword, semaphoreApiKey]) {
+    if (secret) message = message.replaceAll(secret, "[redacted]")
+  }
+  return message
+}
 
 async function requireActor(request: Request, adminOnly = false) {
   const authorization = request.headers.get("Authorization") ?? ""
@@ -76,14 +83,21 @@ function emailProvider() { return gmailUser && gmailAppPassword ? "gmail" : "Res
 
 async function sendEmail(settings: Settings, recipient: string, subject: string, html: string) {
   if (gmailUser && gmailAppPassword) {
-    const client = new SmtpClient()
+    const client = new SMTPClient({
+      connection: {
+        hostname: "smtp.gmail.com",
+        port: 465,
+        tls: true,
+        auth: { username: gmailUser, password: gmailAppPassword },
+      },
+    })
     try {
-      await client.connectTLS({ hostname: "smtp.gmail.com", port: 465, username: gmailUser, password: gmailAppPassword })
       await client.send({
         from: `${settings.resend_from_name} <${gmailUser}>`,
         to: recipient,
         subject,
-        content: html,
+        content: "FixPoint notification: please view this message in an HTML-capable email client.",
+        html,
         replyTo: settings.resend_reply_to || undefined,
       })
       return null
@@ -227,7 +241,7 @@ serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders })
   if (request.method !== "POST") return jsonResponse({ error: "Method not allowed." }, 405)
   try { return await handleRequest(request) } catch (error) {
-    const message = error instanceof Error ? error.message : "The notification request could not be completed."
+    const message = safeErrorMessage(error)
     const status = message === "Unauthorized." ? 401 : message.startsWith("Only active") || message === "Not authorized." ? 403 : 400
     console.error(`[${functionName}] request failed`, { message })
     return jsonResponse({ error: message }, status)

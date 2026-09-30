@@ -1,30 +1,38 @@
 import { supabase } from "@/integrations/supabase/client";
 
+async function notificationErrorMessage(error: { message: string; context?: unknown }) {
+  if (error.context instanceof Response) {
+    const body = await error.context.clone().json().catch(() => null) as { error?: unknown } | null;
+    if (typeof body?.error === "string") return body.error;
+  }
+  return error.message;
+}
+
 export async function processPendingNotifications() {
   const { error } = await supabase.functions.invoke("notification-worker", { body: { action: "process" } });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(await notificationErrorMessage(error));
 }
 
 export async function getNotificationSettings() {
   const { data, error } = await supabase.functions.invoke("notification-worker", { body: { action: "get_settings" } });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(await notificationErrorMessage(error));
   return data.settings as NotificationSettings;
 }
 
 export async function saveNotificationSettings(settings: Partial<NotificationSettings>) {
   const { data, error } = await supabase.functions.invoke("notification-worker", { body: { action: "save_settings", settings } });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(await notificationErrorMessage(error));
   return data.settings as NotificationSettings;
 }
 
 export async function sendTestEmail(recipient: string) {
   const { error } = await supabase.functions.invoke("notification-worker", { body: { action: "test_email", recipient } });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(await notificationErrorMessage(error));
 }
 
 export async function sendTestSms(recipient: string) {
   const { error } = await supabase.functions.invoke("notification-worker", { body: { action: "test_sms", recipient } });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(await notificationErrorMessage(error));
 }
 
 export type NotificationSettings = {
