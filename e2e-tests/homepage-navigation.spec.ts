@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test("desktop homepage navigation reaches the public destinations", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /Reliable repair/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Your Device\. Fixed Right\./ })).toBeVisible();
 
   await page.getByRole("link", { name: "Learn more" }).first().click();
   await expect(page).toHaveURL(/\/about$/);
@@ -14,11 +14,11 @@ test("desktop homepage navigation reaches the public destinations", async ({ pag
 
   await primaryNavigation.getByRole("link", { name: "Services" }).click();
   await expect(page).toHaveURL(/\/#services$/);
-  await expect(page.getByRole("heading", { name: /Good service starts/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Reliable solutions for the devices/ })).toBeVisible();
 
   await primaryNavigation.getByRole("link", { name: "How It Works" }).click();
   await expect(page).toHaveURL(/\/#how-it-works$/);
-  await expect(page.getByRole("heading", { name: /Less guessing/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /A clear path from/ })).toBeVisible();
 
   await primaryNavigation.getByRole("link", { name: "About" }).click();
   await expect(page).toHaveURL(/\/about$/);
@@ -48,7 +48,7 @@ test("desktop homepage navigation reaches the public destinations", async ({ pag
 
   await page.getByRole("link", { name: "FixPoint home" }).first().click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("heading", { name: /Reliable repair/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Your Device\. Fixed Right\./ })).toBeVisible();
 
   const footer = page.getByRole("contentinfo");
   await footer.getByRole("link", { name: "Services" }).click();
